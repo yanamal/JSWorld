@@ -18,17 +18,28 @@
 </head>
 <body>
 
-    <div id="test_buttons">
+    <div id="scene">
+        <div id="door_wrapper">
+            <div id="door" role="button" tabindex="0" aria-label="Open magical door">
+                <div id="door_handle" aria-hidden="true"></div>
+            </div>
+            <div id="scroll" role="button" tabindex="0" aria-label="Enter the magical world of programming"></div>
+        </div>
+    </div>
+
+    <div id="test_buttons" hidden>
         <button onclick="start_popups()">Start popups</button>
         <button onclick="runRemovePopups()">Start removal</button>
     </div>
 
-    <pre id="code_viz"></pre>
+    <pre id="code_viz" hidden></pre>
 
-    <div style="scale: 50%;position: fixed;right: 500px;bottom: 620px;" id="wizard">
-        <img style="position:absolute" src="../img/wizard1.png" alt="a wizard">
-        <img style="position:absolute;rotate: 90deg;transform-origin: 228px 1316px;" src="../img/wand1.png" alt="a hand with a wand">
+    <div id="wizard" aria-hidden="true">
+        <img class="wizard_body" src="../img/wizard1.png" alt="a wizard">
+        <img id="wand" src="../img/wand1.png" alt="a hand with a wand">
     </div>
+
+    <div id="wizard_speech" role="status" aria-live="polite" hidden></div>
 
     <div id="popups"></div>
 

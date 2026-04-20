@@ -1,6 +1,25 @@
 let num_popups = 10;  // make this many pop-ups appear
 let popup_delay = 500;  // milliseconds
 let max_shift = 300;  // pixels
+const WIZARD_INTRO_DELAY_MS = 2200;
+const WAND_RAISE_MS = 900;
+const OPEN_REDIRECT = '../elemental/index.html';
+
+let doorElem;
+let scrollElem;
+let wizardElem;
+let wandElem;
+let speechElem;
+let codeVizElem;
+
+let unlockStarted = false;
+let unlockComplete = false;
+let doorOpened = false;
+let wandOscillationFrame = null;
+
+function wait(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function make_popup() {
     if (num_popups > 0) {
@@ -33,11 +52,11 @@ for (var i = 0; i < nodes.length; i++) {
 
     let parsed = parseIntoHTML(code)
     let vizContainer = document.getElementById('code_viz')
+    vizContainer.hidden = false
     vizContainer.innerHTML = parsed.html
     let codeElem = vizContainer.children[0]
-    animateParse(codeElem).then(() => {
-        interpretCode(codeElem, parsed.ast, 150, true, initAutoDomInterpreter).then((interpret_result) => {
-        })
+    return animateParse(codeElem).then(() => {
+        return interpretCode(codeElem, parsed.ast, 150, true, initAutoDomInterpreter)
     })
 }
 
@@ -335,3 +354,125 @@ function initAutoDomInterpreter(interpreter, globalObject) {
             console.log('[Interpreter]', ...args);
         }));
 }
+
+function showSpeech(text) {
+    speechElem.textContent = text;
+    speechElem.hidden = false;
+}
+
+function startWandOscillation() {
+    if (wandOscillationFrame !== null) {
+        return;
+    }
+
+    wandElem.style.transition = 'none';
+    const amplitude = 12.5;
+    const center = -12.5;
+    const frequency = 1.3;
+    let startTime = null;
+
+    function animate(timestamp) {
+        if (startTime === null) {
+            startTime = timestamp;
+        }
+        const elapsed = (timestamp - startTime) / 1000;
+        const angle = center + amplitude * Math.cos(elapsed * frequency * Math.PI * 2);
+        wandElem.style.setProperty('--wand-angle', `${angle.toFixed(2)}deg`);
+        wandOscillationFrame = requestAnimationFrame(animate);
+    }
+
+    wandOscillationFrame = requestAnimationFrame(animate);
+}
+
+async function startUnlockSequence() {
+    if (unlockStarted) {
+        return;
+    }
+    unlockStarted = true;
+
+    start_popups();
+    await wait(WIZARD_INTRO_DELAY_MS);
+
+    wizardElem.classList.add('visible');
+    showSpeech('Whoops! Hang on, let me fix that!');
+
+    await wait(250);
+    wandElem.style.transition = `transform ${WAND_RAISE_MS}ms cubic-bezier(0.17, 0.84, 0.26, 1)`;
+    wandElem.style.setProperty('--wand-angle', '0deg');
+    await wait(WAND_RAISE_MS);
+
+    startWandOscillation();
+    try {
+        await runRemovePopups();
+    } finally {
+        codeVizElem.innerHTML = '';
+        codeVizElem.hidden = true;
+    }
+
+    showSpeech('There, that\'s better. Now you can open the door to the magical world of programming!');
+    unlockComplete = true;
+}
+
+async function startOpenSequence() {
+    if (doorOpened || !unlockComplete) {
+        return;
+    }
+    doorOpened = true;
+    doorElem.classList.add('open');
+    await wait(280);
+    scrollElem.classList.add('visible');
+}
+
+function onDoorInteract(event) {
+    if (!unlockStarted) {
+        startUnlockSequence();
+        return;
+    }
+    if (!unlockComplete) {
+        return;
+    }
+    if (event.type === 'click') {
+        startOpenSequence();
+    }
+}
+
+function onDoorKeydown(event) {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+        return;
+    }
+    event.preventDefault();
+    if (!unlockStarted) {
+        startUnlockSequence();
+        return;
+    }
+    if (unlockComplete) {
+        startOpenSequence();
+    }
+}
+
+function goToElemental() {
+    window.location.href = OPEN_REDIRECT;
+}
+
+function initScene() {
+    doorElem = document.getElementById('door');
+    scrollElem = document.getElementById('scroll');
+    wizardElem = document.getElementById('wizard');
+    wandElem = document.getElementById('wand');
+    speechElem = document.getElementById('wizard_speech');
+    codeVizElem = document.getElementById('code_viz');
+
+    doorElem.addEventListener('mouseenter', onDoorInteract);
+    doorElem.addEventListener('click', onDoorInteract);
+    doorElem.addEventListener('keydown', onDoorKeydown);
+
+    scrollElem.addEventListener('click', goToElemental);
+    scrollElem.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            goToElemental();
+        }
+    });
+}
+
+window.addEventListener('DOMContentLoaded', initScene);
