@@ -384,6 +384,16 @@ function startWandOscillation() {
     wandOscillationFrame = requestAnimationFrame(animate);
 }
 
+function stopWandOscillationAndLower() {
+    if (wandOscillationFrame !== null) {
+        cancelAnimationFrame(wandOscillationFrame);
+        wandOscillationFrame = null;
+    }
+
+    wandElem.style.transition = 'transform 700ms cubic-bezier(0.2, 0.8, 0.22, 1)';
+    wandElem.style.setProperty('--wand-angle', '90deg');
+}
+
 async function startUnlockSequence() {
     if (unlockStarted) {
         return;
@@ -410,6 +420,7 @@ async function startUnlockSequence() {
     }
 
     showSpeech('There, that\'s better. Now you can open the door to the magical world of programming!');
+    stopWandOscillationAndLower();
     unlockComplete = true;
 }
 
