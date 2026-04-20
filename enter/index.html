@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Enter</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
+    <!-- Loade js-interpreter FIRST, then override its acorn version with the modern acorn version that has a CDN and can be used with the modern acorn-loose.
+         We then use the modern acorn but specify that we are parsing ecma version 5, which is what JS-interpreter expects.
+         This should be fine, nothing can go wrong.-->
+    <script src="https://cdn.jsdelivr.net/npm/js-interpreter/lib/js-interpreter.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/acorn@8.14.0/dist/acorn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/acorn-loose@8.4.0/dist/acorn-loose.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/yanamal/VisualInterpreterJS/visualize.js"></script>
+    <script src="./enter.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/yanamal/VisualInterpreterJS/visualize.css">
+    <link rel="stylesheet" href="enter.css">
+</head>
+<body>
+
+    <div id="test_buttons">
+        <button onclick="start_popups()">Start popups</button>
+        <button onclick="runRemovePopups()">Start removal</button>
+    </div>
+
+    <pre id="code_viz"></pre>
+
+    <div style="scale: 50%" id="wizard">
+        <img style="position:absolute" src="../img/wizard1.png" alt="a wizard">
+        <img style="position:absolute;rotate: 90deg;transform-origin: 228px 1316px;" src="../img/wand1.png" alt="a hand with a wand">
+    </div>
+
+    <div id="popups"></div>
+
+</body>
+</html>

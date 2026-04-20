@@ -1,0 +1,7 @@
+dialog.annoying-dialog {
+    position: fixed;
+    inset: 0;
+    margin: auto;
+    width: fit-content;
+    height: fit-content;
+}
