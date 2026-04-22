@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Enter</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/lib/marked.umd.js"></script>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
     <!-- Loade js-interpreter FIRST, then override its acorn version with the modern acorn version that has a CDN and can be used with the modern acorn-loose.
@@ -23,7 +24,12 @@
             <div id="door" role="button" tabindex="0" aria-label="Open magical door">
                 <div id="door_handle" aria-hidden="true"></div>
             </div>
-            <div id="scroll" role="button" tabindex="0" aria-label="Enter the magical world of programming"></div>
+            <div id="scroll" role="button" tabindex="0" aria-label="Enter the magical world of programming">
+                <h1>It's a PROTOTYPE!!</h1>
+                <div id="scroll-text">
+
+                </div>
+            </div>
         </div>
     </div>
 
@@ -42,6 +48,19 @@
     <div id="wizard_speech" role="status" aria-live="polite" hidden></div>
 
     <div id="popups"></div>
+
+    <script>
+        document.getElementById('scroll-text').innerHTML = marked.parse(`
+- It might break. (quota, bugs)
+- Yes, I'm sure it's too slow, too fast, backwards, not signposted enough, missing "quality-of-life" features.
+- Vertical slice - not necessarily the exact teaching sequence (need to test) (No, I don't know that this is the exact...)
+- There is no state!
+
+Functionality is the focus: precise visual metaphors; bespoke worlds/situations for concepts; **intelligent**(ly designed) AI assistance.
+
+Click anywhere on the scroll to continue!
+        `);
+    </script>
 
 </body>
 </html>
