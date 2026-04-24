@@ -1,0 +1,737 @@
+(function (global) {
+    "use strict";
+
+    const RUNTIME_STYLE_ID = "codescroll-runtime-style";
+
+    function isFn(value) {
+        return typeof value === "function";
+    }
+
+    function escapeHtml(text) {
+        return String(text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function wait(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    function animateMaybe(el, keyframes, options) {
+        if (!el || !isFn(el.animate)) {
+            return wait((options && options.duration) || 0);
+        }
+        return new Promise((resolve) => {
+            const anim = el.animate(keyframes, options);
+            anim.addEventListener("finish", () => resolve(), { once: true });
+            anim.addEventListener("cancel", () => resolve(), { once: true });
+        });
+    }
+
+    function ensureRuntimeStyles() {
+        if (document.getElementById(RUNTIME_STYLE_ID)) {
+            return;
+        }
+        const style = document.createElement("style");
+        style.id = RUNTIME_STYLE_ID;
+        style.textContent = `
+.codescroll {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.codescroll .codescroll-state {
+    position: relative;
+    overflow: hidden;
+}
+
+.codescroll .codescroll-state[hidden] {
+    display: none !important;
+}
+
+.codescroll .code-head {
+    overflow: hidden;
+    white-space: pre;
+}
+
+.codescroll .code-body,
+.codescroll .code-foot {
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.codescroll .code-body {
+    min-height: 30px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+.codescroll .scroll-tail {
+    width: 22px;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+    padding-top: 3px;
+    padding-bottom: 2px;
+    user-select: none;
+    cursor: pointer;
+}
+
+.codescroll .codescroll-head-content {
+    display: block;
+    width: calc(100% - 12px);
+    margin-left: 6px;
+    margin-right: 6px;
+    overflow: hidden;
+}
+
+.codescroll .codescroll-head-text {
+    display: inline-block;
+    white-space: pre;
+    will-change: transform, opacity;
+}
+
+.codescroll .codescroll-blank {
+    white-space: pre;
+}
+
+.codescroll .codescroll-control-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.codescroll .codescroll-parse-btn {
+    color: #1d7a2f;
+}
+
+.codescroll .codescroll-close-btn {
+    color: #7d1e1e;
+}
+
+.codescroll .codescroll-editor-host {
+    width: 100%;
+    min-height: 66px;
+}
+
+.codescroll .codescroll-fallback-editor {
+    width: calc(100% - 2px);
+    min-height: 66px;
+    box-sizing: border-box;
+    border: 1px solid #8f7032;
+    background: rgba(255, 255, 255, 0.32);
+    font-family: Consolas, monospace;
+    font-size: 14px;
+    resize: vertical;
+}
+
+.codescroll .codescroll-error {
+    color: #7f1d1d;
+    margin: 0;
+}
+`;
+        document.head.appendChild(style);
+    }
+
+    function createDiv(className, text) {
+        const div = document.createElement("div");
+        if (className) {
+            div.className = className;
+        }
+        if (typeof text !== "undefined") {
+            div.textContent = text;
+        }
+        return div;
+    }
+
+    function normalizeDefinition(definition) {
+        if (!definition || typeof definition !== "object") {
+            throw new Error("CodeScroll definition must be an object.");
+        }
+        const out = {
+            header: definition.header,
+            body: definition.body,
+            footer: definition.footer,
+            trigger: definition.trigger
+        };
+        for (const key of ["header", "body", "footer", "trigger"]) {
+            if (typeof out[key] !== "string") {
+                throw new Error(`CodeScroll definition.${key} must be a string.`);
+            }
+        }
+        return out;
+    }
+
+    class CodeScroll {
+        constructor(container, definition, options) {
+            if (!container) {
+                throw new Error("CodeScroll requires a parent element.");
+            }
+            ensureRuntimeStyles();
+            this.container = container;
+            this.definition = normalizeDefinition(definition);
+            this.options = options || {};
+            this.model = {
+                header: this.definition.header,
+                body: this.definition.body,
+                footer: this.definition.footer,
+                trigger: this.definition.trigger,
+                currentState: "collapsed",
+                parsed: null,
+                parseSuccess: null,
+                lastWholeCode: null
+            };
+            this._transitionChain = Promise.resolve();
+            this._buildDom();
+            this._initEditor();
+            this.setState(this.options.initialState || "collapsed", { silent: true });
+        }
+
+        _buildDom() {
+            const root = this.container;
+            root.classList.add("codescroll");
+            root.innerHTML = "";
+            if (!root.style.position) {
+                root.style.position = "relative";
+            }
+
+            this.stateElems = {
+                collapsed: createDiv("codescroll-state codescroll-state-collapsed"),
+                editing: createDiv("codescroll-state codescroll-state-editing"),
+                parsed: createDiv("codescroll-state codescroll-state-parsed")
+            };
+
+            // collapsed
+            const cHead = createDiv("code-head");
+            cHead.style.cursor = "pointer";
+            const cHeadContent = createDiv("codescroll-head-content");
+            this.collapsedTriggerText = createDiv("codescroll-head-text", this.model.trigger);
+            cHeadContent.appendChild(this.collapsedTriggerText);
+            cHead.appendChild(cHeadContent);
+            this.collapsedTail = createDiv("scroll-tail");
+            this.collapsedTail.textContent = "▼";
+            this.stateElems.collapsed.appendChild(cHead);
+            this.stateElems.collapsed.appendChild(this.collapsedTail);
+
+            // editing
+            this.editingHead = createDiv("code-head");
+            const eHeadContent = createDiv("codescroll-head-content");
+            this.editingHeadText = createDiv("codescroll-head-text", this.model.header);
+            eHeadContent.appendChild(this.editingHeadText);
+            this.editingHead.appendChild(eHeadContent);
+
+            this.editingBody = createDiv("code-body");
+            this.editorHost = createDiv("codescroll-editor-host");
+            this.editingBody.appendChild(this.editorHost);
+
+            this.editingFoot = createDiv("code-foot");
+            this.editingFooterText = createDiv("", this.model.footer);
+            this.editingFoot.style.position = "relative";
+            this.parseButton = document.createElement("button");
+            this.parseButton.className = "codescroll-control-btn codescroll-parse-btn";
+            this.parseButton.type = "button";
+            this.parseButton.title = "Parse code";
+            this.parseButton.textContent = "✓";
+            this.editingFoot.appendChild(this.editingFooterText);
+            this.editingFoot.appendChild(this.parseButton);
+
+            this.stateElems.editing.appendChild(this.editingHead);
+            this.stateElems.editing.appendChild(this.editingBody);
+            this.stateElems.editing.appendChild(this.editingFoot);
+
+            // parsed
+            this.parsedHead = createDiv("code-head");
+            this.parsedHead.style.position = "relative";
+            this.parsedHeadBlank = createDiv("codescroll-head-content codescroll-blank", "\u00A0");
+            this.closeButton = document.createElement("button");
+            this.closeButton.className = "codescroll-control-btn codescroll-close-btn";
+            this.closeButton.type = "button";
+            this.closeButton.title = "Collapse scroll";
+            this.closeButton.textContent = "✕";
+            this.parsedHead.appendChild(this.parsedHeadBlank);
+            this.parsedHead.appendChild(this.closeButton);
+
+            this.parsedBody = createDiv("code-body");
+            this.parsedFoot = createDiv("code-foot");
+            this.parsedFoot.innerHTML = "&nbsp;";
+            this.stateElems.parsed.appendChild(this.parsedHead);
+            this.stateElems.parsed.appendChild(this.parsedBody);
+            this.stateElems.parsed.appendChild(this.parsedFoot);
+
+            root.appendChild(this.stateElems.collapsed);
+            root.appendChild(this.stateElems.editing);
+            root.appendChild(this.stateElems.parsed);
+
+            // Interactions
+            cHead.addEventListener("click", (event) => this.execute(event));
+            this.collapsedTail.addEventListener("click", (event) => {
+                event.stopPropagation();
+                this.transitionTo("editing");
+            });
+            this.parseButton.addEventListener("click", (event) => {
+                event.stopPropagation();
+                this.transitionTo("parsed");
+            });
+            this.closeButton.addEventListener("click", (event) => {
+                event.stopPropagation();
+                this.transitionTo("collapsed");
+            });
+        }
+
+        _initEditor() {
+            const bodyValue = this.model.body;
+            if (global.ace && isFn(global.ace.edit)) {
+                this.aceEditor = global.ace.edit(this.editorHost);
+                this.aceEditor.session.setMode("ace/mode/javascript");
+                this.aceEditor.setOption("showPrintMargin", false);
+                this.aceEditor.setOption("highlightActiveLine", true);
+                this.aceEditor.setOption("fontFamily", "Consolas, monospace");
+                this.aceEditor.setOption("fontSize", "14px");
+                this.aceEditor.setOption("minLines", 3);
+                this.aceEditor.setOption("maxLines", 50);
+                this.aceEditor.setValue(bodyValue, -1);
+                return;
+            }
+            this.fallbackEditor = document.createElement("textarea");
+            this.fallbackEditor.className = "codescroll-fallback-editor";
+            this.fallbackEditor.value = bodyValue;
+            this.editorHost.appendChild(this.fallbackEditor);
+        }
+
+        _getBodyText() {
+            if (this.aceEditor) {
+                return this.aceEditor.getValue();
+            }
+            return this.fallbackEditor ? this.fallbackEditor.value : "";
+        }
+
+        _setBodyText(newBody) {
+            if (this.aceEditor) {
+                this.aceEditor.setValue(newBody, -1);
+                return;
+            }
+            if (this.fallbackEditor) {
+                this.fallbackEditor.value = newBody;
+            }
+        }
+
+        _refreshBodyFromEditor() {
+            this.model.body = this._getBodyText();
+            return this.model.body;
+        }
+
+        _estimateStateWidth(stateName) {
+            const charsToPx = 8.5;
+            const collapsedBase = 42;
+            const expandedBase = 84;
+            if (stateName === "collapsed") {
+                return Math.max(130, Math.ceil(this.model.trigger.length * charsToPx + collapsedBase));
+            }
+            const bodyText = this._getBodyText();
+            const lines = [this.model.header, ...bodyText.split("\n"), this.model.footer];
+            const longest = lines.reduce((acc, line) => Math.max(acc, line.length), 0);
+            return Math.max(290, Math.ceil(longest * charsToPx + expandedBase));
+        }
+
+        _setWidthForState(stateName, animateMs) {
+            const width = this._estimateStateWidth(stateName);
+            if (animateMs && animateMs > 0) {
+                this.container.style.transition = `width ${animateMs}ms ease`;
+                this.container.style.width = `${width}px`;
+                setTimeout(() => {
+                    this.container.style.transition = "";
+                }, animateMs + 20);
+                return;
+            }
+            this.container.style.width = `${width}px`;
+        }
+
+        _showOnly(stateName) {
+            for (const [name, el] of Object.entries(this.stateElems)) {
+                if (name === stateName) {
+                    el.hidden = false;
+                    el.style.position = "relative";
+                    el.style.left = "";
+                    el.style.top = "";
+                    el.style.width = "";
+                    el.style.zIndex = "";
+                    el.style.transform = "";
+                    el.style.opacity = "";
+                } else {
+                    el.hidden = true;
+                }
+            }
+        }
+
+        _overlayState(name, zIndex) {
+            const el = this.stateElems[name];
+            el.hidden = false;
+            el.style.position = "absolute";
+            el.style.left = "0";
+            el.style.top = "0";
+            el.style.width = "100%";
+            el.style.zIndex = String(zIndex);
+            return el;
+        }
+
+        _cleanupOverlayStyles(name) {
+            const el = this.stateElems[name];
+            el.style.position = "";
+            el.style.left = "";
+            el.style.top = "";
+            el.style.width = "";
+            el.style.zIndex = "";
+            el.style.transform = "";
+            el.style.opacity = "";
+        }
+
+        _finalizeTransition(from, to, extraCallback) {
+            this.model.currentState = to;
+            this._showOnly(to);
+            this._setWidthForState(to);
+            if (to === "editing" && this.aceEditor) {
+                this.aceEditor.resize();
+            }
+            if (isFn(extraCallback)) {
+                extraCallback(this);
+            }
+            this._runTransitionCallbacks(from, to);
+        }
+
+        _runTransitionCallbacks(from, to) {
+            const key = `${from}->${to}`;
+            const tCallbacks = this.options.transitionCallbacks || {};
+            if (isFn(tCallbacks[key])) {
+                tCallbacks[key](this);
+            }
+            if (isFn(this.options.onTransitionComplete)) {
+                this.options.onTransitionComplete({ from, to, scroll: this });
+            }
+        }
+
+        _parseCurrentCode() {
+            const body = this._refreshBodyFromEditor();
+            const whole = `${this.model.header}\n${body}\n${this.model.footer}`;
+            this.model.lastWholeCode = whole;
+            if (!isFn(global.parseIntoHTML)) {
+                this.model.parsed = {
+                    ast: null,
+                    html: `<pre class="codescroll-error">${escapeHtml("parseIntoHTML is not available.")}</pre>`,
+                    parse_success: false,
+                    error: { message: "parseIntoHTML is not available." }
+                };
+                this.model.parseSuccess = false;
+                return this.model.parsed;
+            }
+            try {
+                const parsed = global.parseIntoHTML(whole);
+                this.model.parsed = parsed;
+                this.model.parseSuccess = !!(parsed && parsed.parse_success);
+                return parsed;
+            } catch (error) {
+                this.model.parsed = {
+                    ast: null,
+                    html: `<pre class="codescroll-error">${escapeHtml(error && error.message ? error.message : "Parse failed.")}</pre>`,
+                    parse_success: false,
+                    error: { message: error && error.message ? error.message : "Parse failed." }
+                };
+                this.model.parseSuccess = false;
+                return this.model.parsed;
+            }
+        }
+
+        _renderParsedHtml(parsed) {
+            if (parsed && typeof parsed.html === "string" && parsed.html.length > 0) {
+                this.parsedBody.innerHTML = parsed.html;
+            } else {
+                const msg = parsed && parsed.error && parsed.error.message
+                    ? parsed.error.message
+                    : "No parse output.";
+                this.parsedBody.innerHTML = `<pre class="codescroll-error">${escapeHtml(msg)}</pre>`;
+            }
+            this.parsedCodeElem = this.parsedBody.firstElementChild || this.parsedBody;
+        }
+
+        setState(stateName, opts) {
+            const options = opts || {};
+            if (!this.stateElems[stateName]) {
+                throw new Error(`Unknown CodeScroll state: ${stateName}`);
+            }
+            const from = this.model.currentState;
+            this.model.currentState = stateName;
+            this._showOnly(stateName);
+            this._setWidthForState(stateName);
+            if (stateName === "editing" && this.aceEditor) {
+                this.aceEditor.resize();
+            }
+            if (!options.silent && from !== stateName) {
+                this._runTransitionCallbacks(from, stateName);
+            }
+            return this;
+        }
+
+        transitionTo(targetState, opts) {
+            const options = opts || {};
+            if (!this.stateElems[targetState]) {
+                return Promise.reject(new Error(`Unknown CodeScroll state: ${targetState}`));
+            }
+            this._transitionChain = this._transitionChain.then(() => this._runTransition(targetState, options));
+            return this._transitionChain;
+        }
+
+        async _runTransition(targetState, options) {
+            const from = this.model.currentState;
+            if (from === targetState) {
+                return this;
+            }
+            if (from === "editing" && targetState === "parsed") {
+                await this._transitionEditingToParsed(options);
+                return this;
+            }
+            if (from === "parsed" && targetState === "collapsed") {
+                await this._transitionParsedToCollapsed(options);
+                return this;
+            }
+            if (from === "collapsed" && targetState === "editing") {
+                await this._transitionCollapsedToEditing(options);
+                return this;
+            }
+            this._finalizeTransition(from, targetState, options.onComplete);
+            return this;
+        }
+
+        async _transitionEditingToParsed(options) {
+            const from = "editing";
+            const to = "parsed";
+
+            const parsed = this._parseCurrentCode();
+            this._renderParsedHtml(parsed);
+            this._setWidthForState("parsed");
+
+            const editingEl = this.stateElems.editing;
+            const parsedEl = this.stateElems.parsed;
+            this._overlayState("editing", 2);
+            this._overlayState("parsed", 2);
+            parsedEl.style.transformOrigin = "center center";
+            editingEl.style.transformOrigin = "center center";
+            parsedEl.style.transform = "rotateX(-90deg)";
+            parsedEl.style.opacity = "0";
+
+            await animateMaybe(editingEl, [
+                { transform: "rotateX(0deg)", opacity: 1 },
+                { transform: "rotateX(90deg)", opacity: 0 }
+            ], { duration: 220, easing: "ease-in", fill: "forwards" });
+
+            editingEl.hidden = true;
+            parsedEl.style.opacity = "1";
+            await animateMaybe(parsedEl, [
+                { transform: "rotateX(-90deg)", opacity: 0 },
+                { transform: "rotateX(0deg)", opacity: 1 }
+            ], { duration: 220, easing: "ease-out", fill: "forwards" });
+
+            this._cleanupOverlayStyles("editing");
+            this._cleanupOverlayStyles("parsed");
+            this._finalizeTransition(from, to, options.onComplete);
+
+            if (isFn(global.animateParse) && this.parsedCodeElem) {
+                try {
+                    await global.animateParse(this.parsedCodeElem);
+                } catch (error) {
+                    // animation failures are non-fatal
+                }
+            }
+        }
+
+        async _transitionParsedToCollapsed(options) {
+            const from = "parsed";
+            const to = "collapsed";
+            this._setWidthForState("parsed");
+
+            const parsedEl = this.stateElems.parsed;
+            this._overlayState("parsed", 3);
+            this._overlayState("collapsed", 4);
+            this.collapsedTriggerText.style.transform = "translateY(-90%)";
+            this.collapsedTriggerText.style.opacity = "0";
+            this.collapsedTail.style.transform = "translateY(-120%)";
+            this.collapsedTail.style.opacity = "0";
+
+            const parsedBodyFoot = [this.parsedBody, this.parsedFoot];
+            const hideClose = animateMaybe(this.closeButton, [
+                { opacity: 1 },
+                { opacity: 0 }
+            ], { duration: 80, easing: "linear", fill: "forwards" });
+
+            const slideBodyFoot = Promise.all(parsedBodyFoot.map((el) => animateMaybe(el, [
+                { transform: "translateY(0%)", opacity: 1 },
+                { transform: "translateY(-105%)", opacity: 0 }
+            ], { duration: 230, easing: "ease-in", fill: "forwards" })));
+
+            await Promise.all([hideClose, slideBodyFoot]);
+
+            await Promise.all([
+                animateMaybe(this.collapsedTail, [
+                    { transform: "translateY(-120%)", opacity: 0 },
+                    { transform: "translateY(0%)", opacity: 1 }
+                ], { duration: 170, easing: "ease-out", fill: "forwards" }),
+                animateMaybe(this.collapsedTriggerText, [
+                    { transform: "translateY(-90%)", opacity: 0 },
+                    { transform: "translateY(0%)", opacity: 1 }
+                ], { duration: 180, easing: "ease-out", fill: "forwards" })
+            ]);
+
+            this._setWidthForState("collapsed", 140);
+            await wait(150);
+
+            this.closeButton.style.opacity = "";
+            this.parsedBody.style.transform = "";
+            this.parsedBody.style.opacity = "";
+            this.parsedFoot.style.transform = "";
+            this.parsedFoot.style.opacity = "";
+            this.collapsedTriggerText.style.transform = "";
+            this.collapsedTriggerText.style.opacity = "";
+            this.collapsedTail.style.transform = "";
+            this.collapsedTail.style.opacity = "";
+
+            this._cleanupOverlayStyles("collapsed");
+            this._cleanupOverlayStyles("parsed");
+            this._finalizeTransition(from, to, options.onComplete);
+        }
+
+        async _transitionCollapsedToEditing(options) {
+            const from = "collapsed";
+            const to = "editing";
+            this._setWidthForState("editing");
+
+            this._overlayState("collapsed", 4);
+            this._overlayState("editing", 3);
+
+            this.editingHeadText.style.transform = "translateY(90%)";
+            this.editingHeadText.style.opacity = "0";
+            this.editingBody.style.transform = "translateY(-105%)";
+            this.editingFoot.style.transform = "translateY(-105%)";
+
+            await Promise.all([
+                animateMaybe(this.collapsedTriggerText, [
+                    { transform: "translateY(0%)", opacity: 1 },
+                    { transform: "translateY(100%)", opacity: 0 }
+                ], { duration: 180, easing: "ease-in", fill: "forwards" }),
+                animateMaybe(this.collapsedTail, [
+                    { transform: "translateY(0%)", opacity: 1 },
+                    { transform: "translateY(-120%)", opacity: 0 }
+                ], { duration: 170, easing: "ease-in", fill: "forwards" }),
+                animateMaybe(this.editingBody, [
+                    { transform: "translateY(-105%)", opacity: 1 },
+                    { transform: "translateY(0%)", opacity: 1 }
+                ], { duration: 250, easing: "ease-out", fill: "forwards" }),
+                animateMaybe(this.editingFoot, [
+                    { transform: "translateY(-105%)", opacity: 1 },
+                    { transform: "translateY(0%)", opacity: 1 }
+                ], { duration: 250, easing: "ease-out", fill: "forwards" })
+            ]);
+
+            await animateMaybe(this.editingHeadText, [
+                { transform: "translateY(90%)", opacity: 0 },
+                { transform: "translateY(0%)", opacity: 1 }
+            ], { duration: 170, easing: "ease-out", fill: "forwards" });
+
+            this.editingHeadText.style.transform = "";
+            this.editingHeadText.style.opacity = "";
+            this.editingBody.style.transform = "";
+            this.editingFoot.style.transform = "";
+            this.collapsedTriggerText.style.transform = "";
+            this.collapsedTriggerText.style.opacity = "";
+            this.collapsedTail.style.transform = "";
+            this.collapsedTail.style.opacity = "";
+
+            this._cleanupOverlayStyles("editing");
+            this._cleanupOverlayStyles("collapsed");
+            this._finalizeTransition(from, to, options.onComplete);
+        }
+
+        execute(event) {
+            if (isFn(this.options.onExecute)) {
+                this.options.onExecute({
+                    event: event || null,
+                    trigger: this.model.trigger,
+                    parsed: this.model.parsed,
+                    parseSuccess: this.model.parseSuccess,
+                    scroll: this
+                });
+            }
+        }
+
+        getWholeCode() {
+            return `${this.model.header}\n${this._refreshBodyFromEditor()}\n${this.model.footer}`;
+        }
+
+        getParsed() {
+            return this.model.parsed;
+        }
+
+        getState() {
+            return this.model.currentState;
+        }
+
+        getSnapshot() {
+            return {
+                header: this.model.header,
+                body: this._refreshBodyFromEditor(),
+                footer: this.model.footer,
+                trigger: this.model.trigger,
+                currentState: this.model.currentState,
+                parsed: this.model.parsed,
+                parseSuccess: this.model.parseSuccess,
+                wholeCode: this.model.lastWholeCode || this.getWholeCode()
+            };
+        }
+
+        setBody(bodyText) {
+            this.model.body = String(bodyText);
+            this._setBodyText(this.model.body);
+            return this;
+        }
+    }
+
+    function createCodeScroll(containerOrSelector, definition, options) {
+        const container = typeof containerOrSelector === "string"
+            ? document.querySelector(containerOrSelector)
+            : containerOrSelector;
+        if (!container) {
+            throw new Error("createCodeScroll could not find container element.");
+        }
+        return new CodeScroll(container, definition, options);
+    }
+
+    // Backwards-compatible helper used in old tests.
+    function replace_with_parsed(scrollElem, wholeCode) {
+        if (!scrollElem || !isFn(global.parseIntoHTML)) {
+            return null;
+        }
+        const parsed = global.parseIntoHTML(wholeCode);
+        const codeBody = scrollElem.querySelector(".code-body");
+        if (codeBody) {
+            codeBody.innerHTML = parsed.html;
+            const codeElem = codeBody.firstElementChild || codeBody;
+            if (isFn(global.animateParse)) {
+                global.animateParse(codeElem);
+            }
+        }
+        return parsed;
+    }
+
+    global.CodeScroll = CodeScroll;
+    global.createCodeScroll = createCodeScroll;
+    global.replace_with_parsed = replace_with_parsed;
+}(window));

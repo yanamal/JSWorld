@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Blast CodeScroll Test</title>
+    <!-- Load js-interpreter first, then acorn/acorn-loose -->
+    <script src="https://cdn.jsdelivr.net/npm/js-interpreter/lib/js-interpreter.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/acorn@8.14.0/dist/acorn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/acorn-loose@8.4.0/dist/acorn-loose.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/gh/yanamal/VisualInterpreterJS/visualize.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/yanamal/VisualInterpreterJS/visualize.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.2/src-min-noconflict/ace.js"></script>
+    <link rel="stylesheet" href="common/codescroll.css">
+    <script src="common/codescroll.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: system-ui, sans-serif;
+            background: linear-gradient(180deg, #f5f1e4 0%, #efe5cf 100%);
+        }
+
+        #stage {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+        }
+
+        #blast-scroll {
+            position: absolute;
+            top: 110px;
+            left: 90px;
+        }
+
+        #debug {
+            position: absolute;
+            left: 90px;
+            top: 380px;
+            width: min(760px, calc(100vw - 120px));
+            background: rgba(255, 255, 255, 0.6);
+            border: 1px solid #b59d67;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-family: Consolas, monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+<div id="stage">
+    <div id="blast-scroll"></div>
+    <pre id="debug">Initializing...</pre>
+</div>
+
+<script>
+    const debug = document.getElementById("debug");
+
+    // Stub so trigger behavior is easy to see while testing.
+    function wind(x1, y1, x2, y2, width) {
+        debug.textContent = `wind(${x1}, ${y1}, ${x2}, ${y2}, ${width})`;
+    }
+
+    const blastScroll = createCodeScroll("#blast-scroll", {
+        header: "function blast(x, y) {",
+        body: "    wind(0, 0, x, y, 100)",
+        footer: "}",
+        trigger: "blast(x, y)"
+    }, {
+        initialState: "collapsed",
+        onExecute: ({ trigger, parseSuccess, scroll }) => {
+            debug.textContent =
+                `Execute clicked on collapsed head\n` +
+                `trigger: ${trigger}\n` +
+                `parseSuccess: ${String(parseSuccess)}\n` +
+                `state: ${scroll.getState()}`;
+        },
+        onTransitionComplete: ({ from, to, scroll }) => {
+            debug.textContent =
+                `transition: ${from} -> ${to}\n` +
+                `current state: ${scroll.getState()}\n` +
+                `whole code:\n${scroll.getWholeCode()}`;
+        }
+    });
+
+    window.blastScroll = blastScroll;
+</script>
+</body>
+</html>
