@@ -70,12 +70,13 @@
         trigger: "blast(x, y)"
     }, {
         initialState: "collapsed",
-        onExecute: ({ trigger, parseSuccess, scroll }) => {
+        onExecute: ({ trigger, parseSuccess, scroll, parsed }) => {
             debug.textContent =
                 `Execute clicked on collapsed head\n` +
                 `trigger: ${trigger}\n` +
                 `parseSuccess: ${String(parseSuccess)}\n` +
                 `state: ${scroll.getState()}`;
+            console.log(parsed);
         },
         onTransitionComplete: ({ from, to, scroll }) => {
             debug.textContent =
