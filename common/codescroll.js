@@ -31,6 +31,16 @@
         });
     }
 
+    function clearAnimations(el) {
+        if (!el || !isFn(el.getAnimations)) {
+            return;
+        }
+        const animations = el.getAnimations({ subtree: true });
+        for (const anim of animations) {
+            anim.cancel();
+        }
+    }
+
     function ensureRuntimeStyles() {
         if (document.getElementById(RUNTIME_STYLE_ID)) {
             return;
@@ -45,7 +55,7 @@
 
 .codescroll .codescroll-state {
     position: relative;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .codescroll .codescroll-state[hidden] {
@@ -55,6 +65,11 @@
 .codescroll .code-head {
     overflow: hidden;
     white-space: pre;
+}
+
+.codescroll .codescroll-reveal {
+    position: relative;
+    overflow: visible;
 }
 
 .codescroll .code-body,
@@ -70,7 +85,6 @@
 }
 
 .codescroll .scroll-tail {
-    width: 22px;
     margin-left: auto;
     margin-right: auto;
     text-align: center;
@@ -223,7 +237,9 @@
             this.collapsedTail = createDiv("scroll-tail");
             this.collapsedTail.textContent = "▼";
             this.stateElems.collapsed.appendChild(cHead);
-            this.stateElems.collapsed.appendChild(this.collapsedTail);
+            this.collapsedTailReveal = createDiv("codescroll-reveal");
+            this.collapsedTailReveal.appendChild(this.collapsedTail);
+            this.stateElems.collapsed.appendChild(this.collapsedTailReveal);
 
             // editing
             this.editingHead = createDiv("code-head");
@@ -248,8 +264,10 @@
             this.editingFoot.appendChild(this.parseButton);
 
             this.stateElems.editing.appendChild(this.editingHead);
-            this.stateElems.editing.appendChild(this.editingBody);
-            this.stateElems.editing.appendChild(this.editingFoot);
+            this.editingReveal = createDiv("codescroll-reveal");
+            this.editingReveal.appendChild(this.editingBody);
+            this.editingReveal.appendChild(this.editingFoot);
+            this.stateElems.editing.appendChild(this.editingReveal);
 
             // parsed
             this.parsedHead = createDiv("code-head");
@@ -267,8 +285,10 @@
             this.parsedFoot = createDiv("code-foot");
             this.parsedFoot.innerHTML = "&nbsp;";
             this.stateElems.parsed.appendChild(this.parsedHead);
-            this.stateElems.parsed.appendChild(this.parsedBody);
-            this.stateElems.parsed.appendChild(this.parsedFoot);
+            this.parsedReveal = createDiv("codescroll-reveal");
+            this.parsedReveal.appendChild(this.parsedBody);
+            this.parsedReveal.appendChild(this.parsedFoot);
+            this.stateElems.parsed.appendChild(this.parsedReveal);
 
             root.appendChild(this.stateElems.collapsed);
             root.appendChild(this.stateElems.editing);
@@ -359,6 +379,10 @@
         }
 
         _showOnly(stateName) {
+            for (const el of Object.values(this.stateElems)) {
+                clearAnimations(el);
+            }
+            this._setRevealClipping(false);
             for (const [name, el] of Object.entries(this.stateElems)) {
                 if (name === stateName) {
                     el.hidden = false;
@@ -377,6 +401,7 @@
 
         _overlayState(name, zIndex) {
             const el = this.stateElems[name];
+            clearAnimations(el);
             el.hidden = false;
             el.style.position = "absolute";
             el.style.left = "0";
@@ -384,6 +409,19 @@
             el.style.width = "100%";
             el.style.zIndex = String(zIndex);
             return el;
+        }
+
+        _setRevealClipping(enabled) {
+            const mode = enabled ? "hidden" : "visible";
+            if (this.collapsedTailReveal) {
+                this.collapsedTailReveal.style.overflow = mode;
+            }
+            if (this.editingReveal) {
+                this.editingReveal.style.overflow = mode;
+            }
+            if (this.parsedReveal) {
+                this.parsedReveal.style.overflow = mode;
+            }
         }
 
         _cleanupOverlayStyles(name) {
@@ -558,6 +596,7 @@
             const from = "parsed";
             const to = "collapsed";
             this._setWidthForState("parsed");
+            this._setRevealClipping(true);
 
             const parsedEl = this.stateElems.parsed;
             this._overlayState("parsed", 3);
@@ -613,6 +652,7 @@
             const from = "collapsed";
             const to = "editing";
             this._setWidthForState("editing");
+            this._setRevealClipping(true);
 
             this._overlayState("collapsed", 4);
             this._overlayState("editing", 3);
