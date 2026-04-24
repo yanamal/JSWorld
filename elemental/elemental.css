@@ -1,0 +1,268 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    overflow: hidden;
+    background: #0d1117;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+#playArea {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    cursor: crosshair;
+}
+
+#waterCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.entity {
+    position: absolute;
+    font-size: 48px;
+    transform-origin: center center;
+    z-index: 10;
+    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
+    transition: filter 0.2s;
+    user-select: none;
+}
+
+.entity:hover {
+    filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.6));
+}
+
+.entity-direction {
+    position: absolute;
+    left: 50%;
+    top: -20px;
+    width: 0;
+    height: 0;
+    border-bottom: 14px solid rgba(255, 255, 255, 0.8);
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    transform: translateX(-50%);
+    filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.5));
+}
+
+/* Coordinate axes that follow the wizard */
+.coord-axes {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    pointer-events: none;
+}
+
+.axis {
+    position: absolute;
+    transform-origin: 0 0;
+}
+
+.axis-line {
+    position: absolute;
+    height: 2px;
+    width: 120px;
+    left: 0;
+    top: -1px;
+}
+
+.x-axis .axis-line {
+    background: linear-gradient(90deg, rgba(255, 100, 100, 0.8), rgba(255, 100, 100, 0.2));
+}
+
+.y-axis .axis-line {
+    background: linear-gradient(90deg, rgba(100, 255, 100, 0.8), rgba(100, 255, 100, 0.2));
+}
+
+.axis-arrow {
+    position: absolute;
+    right: -6px;
+    top: -5px;
+    width: 0;
+    height: 0;
+    border-left: 8px solid;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+}
+
+.x-axis .axis-arrow {
+    border-left-color: rgba(255, 100, 100, 0.8);
+}
+
+.y-axis .axis-arrow {
+    border-left-color: rgba(100, 255, 100, 0.8);
+}
+
+.axis-label {
+    position: absolute;
+    right: -30px;
+    top: -10px;
+    font-size: 14px;
+    font-weight: bold;
+    font-family: 'Consolas', monospace;
+}
+
+.x-axis .axis-label {
+    color: rgba(255, 100, 100, 0.9);
+}
+
+.y-axis .axis-label {
+    color: rgba(100, 255, 100, 0.9);
+}
+
+/* Grid tick marks */
+.axis-ticks {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.tick {
+    position: absolute;
+    width: 1px;
+    height: 8px;
+    top: -4px;
+}
+
+.x-axis .tick {
+    background: rgba(255, 100, 100, 0.5);
+}
+
+.y-axis .tick {
+    background: rgba(100, 255, 100, 0.5);
+}
+
+.tick-label {
+    position: absolute;
+    font-size: 10px;
+    font-family: 'Consolas', monospace;
+    top: 8px;
+    transform: translateX(-50%);
+    white-space: nowrap;
+}
+
+.x-axis .tick-label {
+    color: rgba(255, 100, 100, 0.7);
+}
+
+.y-axis .tick-label {
+    color: rgba(100, 255, 100, 0.7);
+}
+
+.fire {
+    position: absolute;
+    font-size: 32px;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+    animation: flicker 0.3s infinite alternate;
+    filter: drop-shadow(0 0 15px rgba(255, 100, 0, 0.8));
+}
+
+@keyframes flicker {
+    0% { transform: translate(-50%, -50%) scale(1) rotate(-3deg); }
+    100% { transform: translate(-50%, -50%) scale(1.1) rotate(3deg); }
+}
+
+.wind-corridor {
+    position: absolute;
+    pointer-events: none;
+    z-index: 15;
+    transform-origin: left center;
+    overflow: hidden;
+}
+
+.wind-particles {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 10px,
+        rgba(200, 220, 255, 0.3) 10px,
+        rgba(200, 220, 255, 0.1) 20px
+    );
+    animation: windMove 0.2s linear infinite;
+}
+
+@keyframes windMove {
+    0% { transform: translateX(-20px); }
+    100% { transform: translateX(0px); }
+}
+
+#instructions {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    color: #a0a0a0;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 20px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.8;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    max-width: 350px;
+}
+
+#instructions h3 {
+    color: #fff;
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+#instructions code {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #7dd3fc;
+    font-family: 'Consolas', monospace;
+}
+
+#instructions .spell {
+    margin: 8px 0;
+    padding-left: 10px;
+    border-left: 3px solid;
+}
+
+#instructions .spell.fire-spell { border-color: #f97316; }
+#instructions .spell.water-spell { border-color: #3b82f6; }
+#instructions .spell.wind-spell { border-color: #a3e635; }
+
+.axis-legend {
+    margin-top: 10px;
+    font-size: 12px;
+}
+
+.axis-legend span {
+    margin-right: 12px;
+}
+
+.axis-legend .x-label { color: rgba(255, 100, 100, 0.9); }
+.axis-legend .y-label { color: rgba(100, 255, 100, 0.9); }
+
+#coordinates {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    color: #a0a0a0;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 15px 20px;
+    border-radius: 12px;
+    font-size: 13px;
+    font-family: 'Consolas', monospace;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}

@@ -56,7 +56,7 @@ for (var i = 0; i < nodes.length; i++) {
     vizContainer.innerHTML = parsed.html
     let codeElem = vizContainer.children[0]
     return animateParse(codeElem).then(() => {
-        return interpretCode(codeElem, parsed.ast, 150, true, initAutoDomInterpreter)
+        return interpretCode(document.getElementById('test_div'), parsed.ast, 150, true, initAutoDomInterpreter)
     })
 }
 

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test for code scroll</title>
+    <!-- Loade js-interpreter FIRST, then override its acorn version with the modern acorn version that has a CDN and can be used with the modern acorn-loose.
+         We then use the modern acorn but specify that we are parsing ecma version 5, which is what JS-interpreter expects.
+         This should be fine, nothing can go wrong.-->
+    <script src="https://cdn.jsdelivr.net/npm/js-interpreter/lib/js-interpreter.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/acorn@8.14.0/dist/acorn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/acorn-loose@8.4.0/dist/acorn-loose.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/gh/yanamal/VisualInterpreterJS/visualize.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/yanamal/VisualInterpreterJS/visualize.css">
+    <link rel="stylesheet" href="common/codescroll.css">
+</head>
+<body>
+
+<div id="testscroll" class="codescroll" style="width: fit-content">
+<div class="code-head"> function splash() { </div>
+<div class="code-body" id="testbody">
+    water(0, 0, 100)
+</div>
+<div class="code-foot"> }</div>
+</div>
+
+<button onclick = "replace()">Replace</button>
+<script>
+    function replace() {
+        replace_result = replace_with_parsed(document.getElementById('testscroll'),
+        `
+function splash() {
+    water(0, 0, 100)
+}
+        `.trim())
+    }
+</script>
+</body>
+</html>
