@@ -1,5 +1,6 @@
 let mousex = null
 let mousey = null
+const targetingCue = document.getElementById('targetingCue')
 window.addEventListener('mousemove', (e)=> {
     mousex = e.clientX
     mousey = e.clientY
@@ -29,6 +30,19 @@ function getTargetedCallText(spellName, worldX, worldY) {
     return `${spellName}(${local.x}, ${local.y})`
 }
 
+function showTargetingCue(spellName) {
+    if (!targetingCue) return
+    targetingCue.textContent = `Targeting ${spellName}(x, y): click to cast`
+    targetingCue.hidden = false
+    document.body.classList.add('targeting-spell-active')
+}
+
+function hideTargetingCue() {
+    if (!targetingCue) return
+    targetingCue.hidden = true
+    document.body.classList.remove('targeting-spell-active')
+}
+
 function executeSpellCall(scrollId, scrollRef, parsedFunction, callText, onDone) {
     const parsed_call = parseIntoHTML(callText)
     const trigger_viz_elem = getTriggerViz(scrollId)
@@ -37,16 +51,23 @@ function executeSpellCall(scrollId, scrollRef, parsedFunction, callText, onDone)
     const combined_ast = structuredClone(parsedFunction.ast)
     combined_ast.body.push(...parsed_call.ast.body)
 
-    animateParse(trigger_viz_elem.children[0], 100, 20).then(() => {
-        let interp_speed = 0
-        if (scrollRef.getState() == "parsed") interp_speed = 200
+    animateParse(trigger_viz_elem.children[0], 100, 20)
+        .then(() => {
+            let interp_speed = 0
+            if (scrollRef.getState() == "parsed") interp_speed = 200
 
-        interpretCode(document.getElementById(scrollId), combined_ast, interp_speed, false, createMagicInitFunc(player)).then((result)=>{
+            return interpretCode(document.getElementById(scrollId), combined_ast, interp_speed, false, createMagicInitFunc(player))
+        })
+        .then((result) => {
             console.log(result)
             trigger_viz_elem.innerHTML = ''
             if (onDone) onDone()
         })
-    })
+        .catch((error) => {
+            console.error(error)
+            trigger_viz_elem.innerHTML = ''
+            if (onDone) onDone()
+        })
 }
 
 let targetedSpellInProgress = false
@@ -55,6 +76,7 @@ function executeTargetedSpell({ scrollId, scrollRef, parsedFunction, spellName }
     targetedSpellInProgress = true
 
     ensureMousePosition()
+    showTargetingCue(spellName)
     const trigger_viz_elem = getTriggerViz(scrollId)
 
     function follow_mouse() {
@@ -73,11 +95,18 @@ function executeTargetedSpell({ scrollId, scrollRef, parsedFunction, spellName }
 
         window.removeEventListener('mousemove', follow_mouse)
         window.removeEventListener('click', finalizeTarget, true)
+        hideTargetingCue()
 
         const callText = getTargetedCallText(spellName, mousex, mousey)
-        executeSpellCall(scrollId, scrollRef, parsedFunction, callText, () => {
+        try {
+            executeSpellCall(scrollId, scrollRef, parsedFunction, callText, () => {
+                targetedSpellInProgress = false
+            })
+        } catch (error) {
+            console.error(error)
             targetedSpellInProgress = false
-        })
+            trigger_viz_elem.innerHTML = ''
+        }
     }
 
     window.addEventListener('click', finalizeTarget, true)

@@ -10,12 +10,41 @@ body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
+body.targeting-spell-active #playArea {
+    cursor: cell;
+    box-shadow: inset 0 0 0 2px rgba(120, 190, 255, 0.35);
+}
+
 #playArea {
     position: relative;
     width: 100vw;
     height: 100vh;
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
     cursor: crosshair;
+}
+
+#targetingCue {
+    position: fixed;
+    left: 50%;
+    top: 24px;
+    transform: translateX(-50%);
+    z-index: 120;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-family: 'Consolas', monospace;
+    font-size: 13px;
+    color: #d9eeff;
+    background: rgba(8, 20, 35, 0.85);
+    border: 1px solid rgba(130, 190, 255, 0.6);
+    box-shadow: 0 0 18px rgba(110, 180, 255, 0.25);
+    animation: targetingPulse 1s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes targetingPulse {
+    0% { opacity: 0.75; }
+    50% { opacity: 1; }
+    100% { opacity: 0.75; }
 }
 
 #waterCanvas {
