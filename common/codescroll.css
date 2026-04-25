@@ -52,3 +52,12 @@
     box-shadow:
         0 12px 24px rgba(0, 0, 0, 0.28);
 }
+
+.trigger-viz {
+    position: fixed;
+    border-radius: 3px;
+    line-height: 1.6;
+    box-shadow: -1px 1px 4px;
+    background-color: aliceblue;
+    transform: translate(-50%, 50%);
+}

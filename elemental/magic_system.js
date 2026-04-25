@@ -1,4 +1,4 @@
-// TODO: wrap/encapsulate so it's possibleto import at top of html?
+// TODO: wrap/encapsulate so it's possibleto import at top of html? use "defer" in script tag?
 
 // ============================================
 // CANVAS SETUP

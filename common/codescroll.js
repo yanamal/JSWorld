@@ -127,6 +127,15 @@
     line-height: 1;
 }
 
+.codescroll .codescroll-play-btn {
+  left: 40%;
+  right: 40%;
+  color: #1d7a2f;
+  border: 1px solid gray;
+  padding: 2px;
+  box-shadow: 2px 2px 2px gray;
+}
+
 .codescroll .codescroll-parse-btn {
     color: #1d7a2f;
 }
@@ -211,9 +220,14 @@
             this._buildDom();
             this._initEditor();
             this.setState(this.options.initialState || "collapsed", { silent: true });
+
+            // Parse initial code when creating
+            const parsed = this._parseCurrentCode();
+            this._renderParsedHtml(parsed);
         }
 
         _buildDom() {
+            // TODO: use html?
             const root = this.container;
             root.classList.add("codescroll");
             root.innerHTML = "";
@@ -273,6 +287,7 @@
             this.parsedHead = createDiv("code-head");
             this.parsedHead.style.position = "relative";
             this.parsedHeadBlank = createDiv("codescroll-head-content codescroll-blank", "\u00A0");
+
             this.closeButton = document.createElement("button");
             this.closeButton.className = "codescroll-control-btn codescroll-close-btn";
             this.closeButton.type = "button";
@@ -280,6 +295,15 @@
             this.closeButton.textContent = "✕";
             this.parsedHead.appendChild(this.parsedHeadBlank);
             this.parsedHead.appendChild(this.closeButton);
+
+
+            this.executeButton = document.createElement("button");
+            this.executeButton.className = "codescroll-control-btn codescroll-play-btn"
+            this.executeButton.type = "button";
+            this.executeButton.title = "Execute Code";
+            this.executeButton.textContent = "▶";
+            this.parsedHead.appendChild(this.executeButton);
+
 
             this.parsedBody = createDiv("code-body");
             this.parsedFoot = createDiv("code-foot");
@@ -290,9 +314,12 @@
             this.parsedReveal.appendChild(this.parsedFoot);
             this.stateElems.parsed.appendChild(this.parsedReveal);
 
+            // TODO:prepend special "executing-call" element (for parsing/executing state of actual trigger with params)
+            const tv = createDiv('trigger-viz');
             root.appendChild(this.stateElems.collapsed);
             root.appendChild(this.stateElems.editing);
             root.appendChild(this.stateElems.parsed);
+            root.appendChild(tv);
 
             // Interactions
             cHead.addEventListener("click", (event) => this.execute(event));
@@ -308,6 +335,10 @@
                 event.stopPropagation();
                 this.transitionTo("collapsed");
             });
+            this.executeButton.addEventListener("click", (event) =>{
+                event.stopPropagation();
+                this.execute()
+            })
         }
 
         _initEditor() {
@@ -464,6 +495,7 @@
             const whole = `${this.model.header}\n${body}\n${this.model.footer}`;
             this.model.lastWholeCode = whole;
             if (!isFn(global.parseIntoHTML)) {
+                // TODO: get rid of this?
                 this.model.parsed = {
                     ast: null,
                     html: `<pre class="codescroll-error">${escapeHtml("parseIntoHTML is not available.")}</pre>`,
@@ -474,6 +506,7 @@
                 return this.model.parsed;
             }
             try {
+                // TODO: don't "handle" parse errors?..
                 const parsed = global.parseIntoHTML(whole);
                 this.model.parsed = parsed;
                 this.model.parseSuccess = !!(parsed && parsed.parse_success);
@@ -754,24 +787,6 @@
         return new CodeScroll(container, definition, options);
     }
 
-    // Backwards-compatible helper used in old tests.
-    function replace_with_parsed(scrollElem, wholeCode) {
-        if (!scrollElem || !isFn(global.parseIntoHTML)) {
-            return null;
-        }
-        const parsed = global.parseIntoHTML(wholeCode);
-        const codeBody = scrollElem.querySelector(".code-body");
-        if (codeBody) {
-            codeBody.innerHTML = parsed.html;
-            const codeElem = codeBody.firstElementChild || codeBody;
-            if (isFn(global.animateParse)) {
-                global.animateParse(codeElem);
-            }
-        }
-        return parsed;
-    }
-
     global.CodeScroll = CodeScroll;
     global.createCodeScroll = createCodeScroll;
-    global.replace_with_parsed = replace_with_parsed;
 }(window));

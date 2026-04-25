@@ -4,12 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>It's Elemental!</title>
+
+    <!-- Load js-interpreter first, then acorn/acorn-loose -->
     <script src="https://cdn.jsdelivr.net/npm/js-interpreter/lib/js-interpreter.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/acorn@8.14.0/dist/acorn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/acorn-loose@8.4.0/dist/acorn-loose.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/gh/yanamal/VisualInterpreterJS@latest/visualize.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/yanamal/VisualInterpreterJS/visualize.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.2/src-min-noconflict/ace.js"></script>
+    <link rel="stylesheet" href="../common/codescroll.css">
+    <script src="../common/codescroll.js"></script>
+
     <link rel="stylesheet" href="elemental.css">
 </head>
 <body>
     <div id="playArea">
         <canvas id="waterCanvas"></canvas>
+        <div id="spells" style="position: absolute; left: 20px; top: 20px;">
+            <div id="splash-scroll" style="position: absolute"></div>
+        </div>
     </div>
 
     <div id="coordinates">
@@ -19,5 +34,6 @@
 
     <script src="magic_system.js"></script>
     <script src="magic_interpreter.js"></script>
+    <script src="magic_spells.js"></script>
 </body>
 </html>
