@@ -150,6 +150,21 @@ class Entity {
     }
 
     /**
+     * Convert world coordinates to local coordinates
+     * This is the inverse of localToWorld().
+     */
+    worldToLocal(worldX, worldY) {
+        const dx = worldX - this.x;
+        const dy = worldY - this.y;
+        const sin = Math.sin(this.rotation);
+        const cos = Math.cos(this.rotation);
+        return {
+            x: dx * sin - dy * cos,
+            y: -dx * cos - dy * sin
+        };
+    }
+
+    /**
      * 🔥 FIRE SPELL
      * Creates a fire at the relative position (x, y)
      */
