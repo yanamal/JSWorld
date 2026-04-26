@@ -591,6 +591,9 @@
             const body = this._refreshBodyFromEditor();
             const whole = `${this.model.header}\n${body}\n${this.model.footer}`;
             this.model.lastWholeCode = whole;
+
+            this.parsedFoot.innerHTML = "&nbsp;"; // reset any "replay" from previous parse
+
             if (!isFn(global.parseIntoHTML)) {
                 // TODO: skip isFn checks in general? if for some reason these functions don't exist, there is no point in trying to make anything work
                 this.model.parsed = {

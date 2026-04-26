@@ -45,7 +45,7 @@ function hideTargetingCue() {
 
 function executeSpellCall(scrollId, scrollRef, parsedFunction, callText, onDone) {
     // remove previous replay
-    document.getElementById(scrollId).querySelector('.codescroll-state-parsed .code-foot').innerHTML = ''
+    document.getElementById(scrollId).querySelector('.codescroll-state-parsed .code-foot').innerHTML = "&nbsp;"
 
     const parsed_call = parseIntoHTML(callText)
     const trigger_viz_elem = getTriggerViz(scrollId)
