@@ -503,7 +503,7 @@
             const whole = `${this.model.header}\n${body}\n${this.model.footer}`;
             this.model.lastWholeCode = whole;
             if (!isFn(global.parseIntoHTML)) {
-                // TODO: get rid of this?
+                // TODO: skip isFn checks in general? if for some reason these functions don't exist, there is no point in trying to make anything work
                 this.model.parsed = {
                     ast: null,
                     html: `<pre class="codescroll-error">${escapeHtml("parseIntoHTML is not available.")}</pre>`,
@@ -514,7 +514,6 @@
                 return this.model.parsed;
             }
             try {
-                // TODO: don't "handle" parse errors?..
                 const parsed = global.parseIntoHTML(whole);
                 this.model.parsed = parsed;
                 this.model.parseSuccess = !!(parsed && parsed.parse_success);
