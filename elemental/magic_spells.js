@@ -44,6 +44,9 @@ function hideTargetingCue() {
 }
 
 function executeSpellCall(scrollId, scrollRef, parsedFunction, callText, onDone) {
+    // remove previous replay
+    document.getElementById(scrollId).querySelector('.codescroll-state-parsed .code-foot').innerHTML = ''
+
     const parsed_call = parseIntoHTML(callText)
     const trigger_viz_elem = getTriggerViz(scrollId)
     trigger_viz_elem.innerHTML = parsed_call.html
@@ -60,6 +63,12 @@ function executeSpellCall(scrollId, scrollRef, parsedFunction, callText, onDone)
         })
         .then((result) => {
             console.log(result)
+
+            const fullTrace = result.executionTrace;
+            const condensedTrace = fullTrace.filter(getTraceStepFilter());
+            const condensedSlider = createTraceSlider(condensedTrace, document.getElementById(scrollId));
+            document.getElementById(scrollId).querySelector('.codescroll-state-parsed .code-foot').appendChild(condensedSlider)
+
             trigger_viz_elem.innerHTML = ''
             if (onDone) onDone()
         })
