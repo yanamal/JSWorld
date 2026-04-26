@@ -75,6 +75,10 @@
     white-space: pre;
 }
 
+.codescroll .code-head.codescroll-execute-disabled {
+    cursor: not-allowed;
+}
+
 .codescroll .codescroll-reveal {
     position: relative;
     overflow: visible;
@@ -144,6 +148,13 @@
   box-shadow: 2px 2px 2px gray;
 }
 
+.codescroll .codescroll-play-btn:disabled {
+    color: #666;
+    box-shadow: none;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
 .codescroll .codescroll-parse-btn {
     color: #1d7a2f;
 }
@@ -171,6 +182,25 @@
 .codescroll .codescroll-error {
     color: #7f1d1d;
     margin: 0;
+}
+
+.codescroll .codescroll-parse-error-indicator {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #b91c1c;
+    font-size: 14px;
+    font-weight: 700;
+    pointer-events: none;
+    user-select: none;
+}
+
+.codescroll .codescroll-parse-error-indicator-collapsed {
+    right: 8px;
+}
+
+.codescroll .codescroll-parse-error-indicator-parsed {
+    left: 8px;
 }
 `;
         document.head.appendChild(style);
@@ -251,11 +281,18 @@
 
             // collapsed
             const cHead = createDiv("code-head");
-            cHead.style.cursor = "pointer";
+            this.collapsedHead = cHead;
             const cHeadContent = createDiv("codescroll-head-content");
             this.collapsedTriggerText = createDiv("codescroll-head-text", this.model.trigger);
             cHeadContent.appendChild(this.collapsedTriggerText);
             cHead.appendChild(cHeadContent);
+            this.collapsedParseErrorIndicator = createDiv(
+                "codescroll-parse-error-indicator codescroll-parse-error-indicator-collapsed",
+                "✖"
+            );
+            this.collapsedParseErrorIndicator.title = "Code has parse errors";
+            this.collapsedParseErrorIndicator.hidden = true;
+            cHead.appendChild(this.collapsedParseErrorIndicator);
             this.collapsedTail = createDiv("scroll-tail");
             this.collapsedTail.textContent = "▼";
             this.stateElems.collapsed.appendChild(cHead);
@@ -311,6 +348,13 @@
             this.executeButton.title = "Execute Code";
             this.executeButton.textContent = "▶";
             this.parsedHead.appendChild(this.executeButton);
+            this.parsedParseErrorIndicator = createDiv(
+                "codescroll-parse-error-indicator codescroll-parse-error-indicator-parsed",
+                "✖"
+            );
+            this.parsedParseErrorIndicator.title = "Code has parse errors";
+            this.parsedParseErrorIndicator.hidden = true;
+            this.parsedHead.appendChild(this.parsedParseErrorIndicator);
 
 
             this.parsedBody = createDiv("code-body");
@@ -330,7 +374,13 @@
             root.appendChild(tv);
 
             // Interactions
-            cHead.addEventListener("click", (event) => this.execute(event));
+            cHead.addEventListener("click", (event) => {
+                if (!this._canExecute()) {
+                    event.preventDefault();
+                    return;
+                }
+                this.execute(event);
+            });
             this.collapsedTail.addEventListener("click", (event) => {
                 event.stopPropagation();
                 this.transitionTo("editing");
@@ -345,7 +395,11 @@
             });
             this.executeButton.addEventListener("click", (event) =>{
                 event.stopPropagation();
-                this.execute()
+                if (!this._canExecute()) {
+                    event.preventDefault();
+                    return;
+                }
+                this.execute(event);
             })
         }
 
@@ -511,12 +565,14 @@
                     error: { message: "parseIntoHTML is not available." }
                 };
                 this.model.parseSuccess = false;
+                this._syncExecutionAvailability();
                 return this.model.parsed;
             }
             try {
                 const parsed = global.parseIntoHTML(whole);
                 this.model.parsed = parsed;
                 this.model.parseSuccess = !!(parsed && parsed.parse_success);
+                this._syncExecutionAvailability();
                 return parsed;
             } catch (error) {
                 this.model.parsed = {
@@ -526,7 +582,32 @@
                     error: { message: error && error.message ? error.message : "Parse failed." }
                 };
                 this.model.parseSuccess = false;
+                this._syncExecutionAvailability();
                 return this.model.parsed;
+            }
+        }
+
+        _canExecute() {
+            return this.model.parseSuccess === true;
+        }
+
+        _syncExecutionAvailability() {
+            const canExecute = this._canExecute();
+            if (this.collapsedHead) {
+                this.collapsedHead.classList.toggle("codescroll-execute-disabled", !canExecute);
+                this.collapsedHead.style.cursor = canExecute ? "pointer" : "not-allowed";
+            }
+            if (this.executeButton) {
+                this.executeButton.disabled = !canExecute;
+                this.executeButton.title = canExecute
+                    ? "Execute Code"
+                    : "Cannot execute: current code failed to parse";
+            }
+            if (this.collapsedParseErrorIndicator) {
+                this.collapsedParseErrorIndicator.hidden = canExecute;
+            }
+            if (this.parsedParseErrorIndicator) {
+                this.parsedParseErrorIndicator.hidden = canExecute;
             }
         }
 
@@ -741,6 +822,9 @@
         }
 
         execute(event) {
+            if (!this._canExecute()) {
+                return false;
+            }
             if (isFn(this.options.onExecute)) {
                 this.options.onExecute({
                     event: event || null,
@@ -750,6 +834,7 @@
                     scroll: this
                 });
             }
+            return true;
         }
 
         getWholeCode() {
