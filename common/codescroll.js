@@ -307,10 +307,17 @@
 
             // editing
             this.editingHead = createDiv("code-head");
+            this.editingHead.style.position = "relative";
             const eHeadContent = createDiv("codescroll-head-content");
             this.editingHeadText = createDiv("codescroll-head-text", this.model.header);
             eHeadContent.appendChild(this.editingHeadText);
             this.editingHead.appendChild(eHeadContent);
+            this.editingCloseButton = document.createElement("button");
+            this.editingCloseButton.className = "codescroll-control-btn codescroll-close-btn";
+            this.editingCloseButton.type = "button";
+            this.editingCloseButton.title = "Close and parse";
+            this.editingCloseButton.textContent = "✕";
+            this.editingHead.appendChild(this.editingCloseButton);
 
             this.editingBody = createDiv("code-body");
             this.editorHost = createDiv("codescroll-editor-host");
@@ -401,6 +408,10 @@
                 event.stopPropagation();
                 this.transitionTo("parsed");
             });
+            this.editingCloseButton.addEventListener("click", (event) => {
+                event.stopPropagation();
+                this._closeFromEditing();
+            });
             this.closeButton.addEventListener("click", (event) => {
                 event.stopPropagation();
                 this.transitionTo("collapsed");
@@ -417,6 +428,14 @@
                 }
                 this.execute(event);
             })
+        }
+
+        _closeFromEditing() {
+            this.transitionTo("parsed").then(() => {
+                if (this.model.parseSuccess === true) {
+                    this.transitionTo("collapsed");
+                }
+            });
         }
 
         _initEditor() {
