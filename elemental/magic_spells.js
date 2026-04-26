@@ -54,7 +54,7 @@ function executeSpellCall(scrollId, scrollRef, parsedFunction, callText, onDone)
     animateParse(trigger_viz_elem.children[0], 100, 20)
         .then(() => {
             let interp_speed = 0
-            if (scrollRef.getState() == "parsed") interp_speed = 200
+            if (scrollRef.getState() == "parsed") interp_speed = 250
 
             return interpretCode(document.getElementById(scrollId), combined_ast, interp_speed, false, createMagicInitFunc(player))
         })
@@ -137,7 +137,7 @@ function createTargetedSpellScroll({ scrollId, spellName, body }) {
 const splashScroll = createCodeScroll("#splash-scroll",
     {
         header: "function splash() {",
-        body: "    water(0, 0, 100)",
+        body: "    water(0, 0, 100);",
         footer: "}",
         trigger: "splash()"
     }, {
@@ -163,11 +163,13 @@ const splashScroll = createCodeScroll("#splash-scroll",
 const whooshScroll = createTargetedSpellScroll({
     scrollId: 'whoosh-scroll',
     spellName: 'whoosh',
-    body: "    water(x, y, 100)"
+    body: "    wind(0, 0, x, y, 100);"
 })
 
 const putOutFireScroll = createTargetedSpellScroll({
     scrollId: 'put-out-fire-scroll',
     spellName: 'put_out_fire',
-    body: "    // TODO: add spell behavior"
+    body:
+`    water(x, y, 100);
+    wind(0, 0, x, y, 100);`
 })

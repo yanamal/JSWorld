@@ -62,6 +62,14 @@
     display: none !important;
 }
 
+.codescroll .codescroll-state-editing {
+    z-index: 100;
+}
+
+.codescroll .codescroll-state-parsed {
+    z-index: 100;
+}
+
 .codescroll .code-head {
     overflow: hidden;
     white-space: pre;
