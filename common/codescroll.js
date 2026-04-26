@@ -254,6 +254,7 @@
                 body: this.definition.body,
                 footer: this.definition.footer,
                 trigger: this.definition.trigger,
+                editingEnabled: this.options.editingEnabled !== false,
                 currentState: "collapsed",
                 parsed: null,
                 parseSuccess: null,
@@ -261,6 +262,7 @@
             };
             this._transitionChain = Promise.resolve();
             this._buildDom();
+            this._syncEditingAvailability();
             this._initEditor();
             this.setState(this.options.initialState || "collapsed", { silent: true });
 
@@ -402,6 +404,10 @@
             });
             this.collapsedTail.addEventListener("click", (event) => {
                 event.stopPropagation();
+                if (!this._isEditingEnabled()) {
+                    event.preventDefault();
+                    return;
+                }
                 this.transitionTo("editing");
             });
             this.parseButton.addEventListener("click", (event) => {
@@ -418,6 +424,10 @@
             });
             this.editButton.addEventListener("click", (event) => {
                 event.stopPropagation();
+                if (!this._isEditingEnabled()) {
+                    event.preventDefault();
+                    return;
+                }
                 this.transitionTo("editing");
             });
             this.executeButton.addEventListener("click", (event) =>{
@@ -629,6 +639,23 @@
             return this.model.parseSuccess === true;
         }
 
+        _isEditingEnabled() {
+            return this.model.editingEnabled !== false;
+        }
+
+        _syncEditingAvailability() {
+            const editingEnabled = this._isEditingEnabled();
+            if (this.collapsedTail) {
+                this.collapsedTail.textContent = editingEnabled ? "▼" : "";
+                this.collapsedTail.style.cursor = editingEnabled ? "pointer" : "default";
+                this.collapsedTail.title = editingEnabled ? "Edit code" : "Editing is disabled";
+            }
+            if (this.editButton) {
+                this.editButton.disabled = !editingEnabled;
+                this.editButton.title = editingEnabled ? "Back to editing" : "Editing is disabled";
+            }
+        }
+
         _syncExecutionAvailability() {
             const canExecute = this._canExecute();
             if (this.collapsedHead) {
@@ -691,6 +718,9 @@
         async _runTransition(targetState, options) {
             const from = this.model.currentState;
             if (from === targetState) {
+                return this;
+            }
+            if (targetState === "editing" && !this._isEditingEnabled()) {
                 return this;
             }
             if (from === "editing" && targetState === "parsed") {
@@ -928,11 +958,22 @@
                 body: this._refreshBodyFromEditor(),
                 footer: this.model.footer,
                 trigger: this.model.trigger,
+                editingEnabled: this.model.editingEnabled,
                 currentState: this.model.currentState,
                 parsed: this.model.parsed,
                 parseSuccess: this.model.parseSuccess,
                 wholeCode: this.model.lastWholeCode || this.getWholeCode()
             };
+        }
+
+        setEditingEnabled(enabled) {
+            this.model.editingEnabled = enabled !== false;
+            this._syncEditingAvailability();
+            return this;
+        }
+
+        isEditingEnabled() {
+            return this._isEditingEnabled();
         }
 
         setBody(bodyText) {

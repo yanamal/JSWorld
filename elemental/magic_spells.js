@@ -131,6 +131,7 @@ function createTargetedSpellScroll({ scrollId, spellName, body }) {
             trigger: `${spellName}(x, y)`
         }, {
             initialState: "collapsed",
+            editingEnabled: false,
             onExecute: ({ parsed }) => {
                 executeTargetedSpell({
                     scrollId,
@@ -151,6 +152,7 @@ const splashScroll = createCodeScroll("#splash-scroll",
         trigger: "splash()"
     }, {
         initialState: "collapsed",
+        editingEnabled: false,
         onExecute: ({ trigger, parseSuccess, scroll, parsed }) => {
             console.log(parsed.ast);
 
@@ -182,3 +184,5 @@ const putOutFireScroll = createTargetedSpellScroll({
 `    water(x, y, 100);
     wind(0, 0, x, y, 100);`
 })
+
+putOutFireScroll.setEditingEnabled(true)
