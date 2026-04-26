@@ -159,6 +159,11 @@
     color: #1d7a2f;
 }
 
+.codescroll .codescroll-edit-btn {
+    color: #1f4f8a;
+    right: 30px;
+}
+
 .codescroll .codescroll-close-btn {
     color: #7d1e1e;
 }
@@ -356,6 +361,13 @@
             this.parsedParseErrorIndicator.hidden = true;
             this.parsedHead.appendChild(this.parsedParseErrorIndicator);
 
+            this.editButton = document.createElement("button");
+            this.editButton.className = "codescroll-control-btn codescroll-edit-btn";
+            this.editButton.type = "button";
+            this.editButton.title = "Back to editing";
+            this.editButton.textContent = "↩";
+            this.parsedHead.appendChild(this.editButton);
+
 
             this.parsedBody = createDiv("code-body");
             this.parsedFoot = createDiv("code-foot");
@@ -392,6 +404,10 @@
             this.closeButton.addEventListener("click", (event) => {
                 event.stopPropagation();
                 this.transitionTo("collapsed");
+            });
+            this.editButton.addEventListener("click", (event) => {
+                event.stopPropagation();
+                this.transitionTo("editing");
             });
             this.executeButton.addEventListener("click", (event) =>{
                 event.stopPropagation();
@@ -663,6 +679,10 @@
                 await this._transitionParsedToCollapsed(options);
                 return this;
             }
+            if (from === "parsed" && targetState === "editing") {
+                await this._transitionParsedToEditing(options);
+                return this;
+            }
             if (from === "collapsed" && targetState === "editing") {
                 await this._transitionCollapsedToEditing(options);
                 return this;
@@ -766,6 +786,37 @@
 
             this._cleanupOverlayStyles("collapsed");
             this._cleanupOverlayStyles("parsed");
+            this._finalizeTransition(from, to, options.onComplete);
+        }
+
+        async _transitionParsedToEditing(options) {
+            const from = "parsed";
+            const to = "editing";
+            this._setWidthForState("editing");
+
+            const parsedEl = this.stateElems.parsed;
+            const editingEl = this.stateElems.editing;
+            this._overlayState("parsed", 2);
+            this._overlayState("editing", 2);
+            editingEl.style.transformOrigin = "center center";
+            parsedEl.style.transformOrigin = "center center";
+            editingEl.style.transform = "rotateX(-90deg)";
+            editingEl.style.opacity = "0";
+
+            await animateMaybe(parsedEl, [
+                { transform: "rotateX(0deg)", opacity: 1 },
+                { transform: "rotateX(90deg)", opacity: 0 }
+            ], { duration: 220, easing: "ease-in", fill: "forwards" });
+
+            parsedEl.hidden = true;
+            editingEl.style.opacity = "1";
+            await animateMaybe(editingEl, [
+                { transform: "rotateX(-90deg)", opacity: 0 },
+                { transform: "rotateX(0deg)", opacity: 1 }
+            ], { duration: 220, easing: "ease-out", fill: "forwards" });
+
+            this._cleanupOverlayStyles("parsed");
+            this._cleanupOverlayStyles("editing");
             this._finalizeTransition(from, to, options.onComplete);
         }
 
