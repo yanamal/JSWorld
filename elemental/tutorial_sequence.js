@@ -15,7 +15,7 @@
 
     const STEP_TEXT = {
         step0: `
-You can do almost anything with programming! But let's start with some elemental magic. You'll control this small wizard living in a 2D world.
+You can do almost anything with programming! But let's start with some simple elemental magic. You'll control this small wizard living in a 2D world.
 
 **Click anywhere on the screen to move around!**
 `,
@@ -25,23 +25,27 @@ I've given you your first **function**: think of it as a spell you can **call** 
 **Put out all 3 fires by calling \`splash()\` near each one!**
 `,
         step2: `
-That's great, but now there are a lot of puddles here. I'll give you another function: \`whoosh\` creates wind that will brush away the water. This one takes in **parameters**: \`whoosh(x, y)\` will make a wind tunnel between you and the position \`x, y\`. You can control it by clicking on the scroll, then clicking wherever you want \`x, y\` to be!
+That's great, but now there are lots of puddles. I'll give you another function: \`whoosh\` creates wind that will brush away the water. This one takes in **parameters**: \`whoosh(x, y)\` will make a wind tunnel between you and the position \`x, y\`. You can control it by clicking on the scroll, then clicking wherever you want \`x, y\` to be!
 
 **Use the \`whoosh\` function to clean up at least half the water.**
 `,
         step3: `
 Wouldn't it be convenient if we could make up a new spell that would put out the fire and clean it up all at once?
 
-Well, of course we can! Through the magic of programming, we can create new functions that do as many things as we like. Actually, I started writing this spell but then got distracted and it doesn't quite work right. See if you can fix it! Edit the code and click the checkbox.
+Well, of course we can! Through the magic of programming, we can create new functions that do as many things as we like. Actually, I started writing this spell but then got distracted and it doesn't quite work right. 
 
-**Click the green checkbox to see how \`put_out_fire\` works right now!**
+**See if you can fix the \`put_out_fire\` spell!** Edit it and click \`✓\`. When you think it's ready, click "**Play with fire!**" and I'll create some fire to test it with.
 `
     };
 
     const SIDE_TEXT = {
-        parseSuccess: "The function parsed! That means the code didn't have any errors in it.",
+        playWithFire: "When you think you've got `put_out_fire` working right, click \"**Play with fire!**\" — I'll spawn some fire to put out.",
         parseOrExecutionError: 'Hmm, something went wrong there.',
-        replay: 'After you execute the code in this mode, you can examine what happened using the instant replay.'
+        parseSuccess: "The function parsed! That means the code didn't have any errors in it. You can use the \" ▶ \" button to call the function. " +
+            "In this view, it will show you what happens step-by-step!",
+        replay: 'In this view, after you call the function, you can examine what happened using the instant replay. \n (you can do this with `whoosh` and `splash` too, now!)',
+        firesLeft: 'Hmm, looks like you missed the fire...',
+        waterLeft: 'Not bad, but I still see some water left over!',
     };
 
     function wait(ms) {
@@ -155,6 +159,12 @@ Well, of course we can! Through the magic of programming, we can create new func
                             await putOutScroll.transitionTo('editing');
                         }
 
+                        // TODO: maybe use proper getScroll stuff
+                        splashScroll.setEditingEnabled(true)
+                        whooshScroll.setEditingEnabled(true)
+
+                        this.showSideSpeech(SIDE_TEXT.playWithFire);
+
                         this.highlightElement(
                             'step3-parse-btn',
                             this.getSpellControl('put_out_fire', '.codescroll-state-editing .codescroll-parse-btn'),
@@ -162,7 +172,7 @@ Well, of course we can! Through the magic of programming, we can create new func
                         );
                     },
                     onEvent: () => {
-                        // Step completion is handled by the explicit Test it! flow.
+                        // Step completion is handled by the explicit "Play with fire!" flow.
                     }
                 }
             ];
@@ -373,7 +383,8 @@ Well, of course we can! Through the magic of programming, we can create new func
 
         countWaterPixels() {
             if (typeof window.countWaterPixels === 'function') {
-                return window.countWaterPixels();
+                const px =  window.countWaterPixels();
+                return px;
             }
             return 0;
         }
@@ -484,17 +495,24 @@ Well, of course we can! Through the magic of programming, we can create new func
         }
 
         handleTestCastResult(detail) {
+            const water_tolerance = 200;
             if (!this.stepState.waitingForTestCast) return;
 
             this.stepState.waitingForTestCast = false;
             const noFiresLeft = window.fires.length === 0;
             const waterPixels = this.countWaterPixels();
-            const passed = !!detail && detail.ok === true && noFiresLeft && waterPixels < 50;
+            const passed = !!detail && detail.ok === true && noFiresLeft && waterPixels <= water_tolerance;
 
             if (passed) {
                 this.finishTestRun();
                 this.completeCurrentStep();
                 return;
+            }
+            else if(!noFiresLeft) {
+                this.showSideSpeech(SIDE_TEXT.firesLeft);
+            }
+            else if(waterPixels > water_tolerance) {
+                this.showSideSpeech(SIDE_TEXT.waterLeft);
             }
 
             if (typeof window.clearWater === 'function') {

@@ -257,7 +257,8 @@ const splashScroll = createCodeScroll(
     '#splash-scroll',
     {
         header: 'function splash() {',
-        body: '    water(0, 0, 100);',
+        body: '    // Create a circle of water centered around (0, 0) - my position - and with a radius of 100.\n' +
+            '    water(0, 0, 100);',
         footer: '}',
         trigger: 'splash()'
     },
@@ -273,14 +274,18 @@ const splashScroll = createCodeScroll(
 const whooshScroll = createTargetedSpellScroll({
     scrollId: 'whoosh-scroll',
     spellName: 'whoosh',
-    body: '    wind(0, 0, x, y, 100);',
+    body: '    // Create a wind tunnel from (0, 0) to (x, y) with a width of 100.\n' +
+        '    wind(0, 0, x, y, 100);',
     editingEnabled: false
 });
 
 const putOutFireScroll = createTargetedSpellScroll({
     scrollId: 'put-out-fire-scroll',
     spellName: 'put_out_fire',
-    body: `    water(x, y, 100);
+    body: `    // This is a comment - anything after "//" isn't part of the program, it's just here for us.
+    // Make a circle of water centered on (x, y), with a radius of 100.
+    water(x, y, 100);
+    // Make a wind tunnel from my position (0, 0) to (x, y), with a width of 100.
     wind(0, 0, x, y, 100);`,
     editingEnabled: true
 });
