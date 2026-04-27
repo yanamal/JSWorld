@@ -100,6 +100,8 @@ class Entity {
     }
 
     moveTo(targetX, targetY) {
+        const fromX = this.x;
+        const fromY = this.y;
         this.targetX = targetX;
         this.targetY = targetY;
         // Calculate rotation where 0 = UP, positive = clockwise
@@ -109,6 +111,14 @@ class Entity {
         this.rotation = Math.atan2(dx, -dy);
         this.isMoving = true;
         this.updateElement();
+        window.dispatchEvent(new CustomEvent('elemental:player-move-start', {
+            detail: {
+                fromX,
+                fromY,
+                toX: targetX,
+                toY: targetY
+            }
+        }));
     }
 
     update(deltaTime) {
@@ -402,6 +412,18 @@ window.clearFires = () => {
         removeFire(fires[0]);
     }
     console.log('🔥 All fires cleared');
+};
+
+window.countWaterPixels = () => {
+    const imageData = waterCtx.getImageData(0, 0, waterCanvas.width, waterCanvas.height);
+    const data = imageData.data;
+    let count = 0;
+    for (let i = 3; i < data.length; i += 4) {
+        if (data[i] > 0) {
+            count += 1;
+        }
+    }
+    return count;
 };
 
 // Welcome message

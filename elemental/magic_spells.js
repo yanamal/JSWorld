@@ -1,188 +1,355 @@
-let mousex = null
-let mousey = null
-const targetingCue = document.getElementById('targetingCue')
-window.addEventListener('mousemove', (e)=> {
-    mousex = e.clientX
-    mousey = e.clientY
-})
+let mousex = null;
+let mousey = null;
+const targetingCue = document.getElementById('targetingCue');
+
+window.addEventListener('mousemove', (event) => {
+    mousex = event.clientX;
+    mousey = event.clientY;
+});
+
+function emitElementalEvent(name, detail) {
+    window.dispatchEvent(new CustomEvent(name, { detail }));
+}
 
 function getTriggerViz(scrollId) {
-    return document.getElementById(scrollId).querySelector('.trigger-viz')
+    return document.getElementById(scrollId).querySelector('.trigger-viz');
 }
 
 function ensureMousePosition() {
     if (mousex === null || mousey === null) {
-        mousex = player.x
-        mousey = player.y
+        mousex = player.x;
+        mousey = player.y;
     }
 }
 
 function getRoundedLocalCoordsFromWorld(worldX, worldY) {
-    const local = player.worldToLocal(worldX, worldY)
+    const local = player.worldToLocal(worldX, worldY);
     return {
         x: Math.round(local.x),
         y: Math.round(local.y)
-    }
+    };
 }
 
 function getTargetedCallText(spellName, worldX, worldY) {
-    const local = getRoundedLocalCoordsFromWorld(worldX, worldY)
-    return `${spellName}(${local.x}, ${local.y})`
+    const local = getRoundedLocalCoordsFromWorld(worldX, worldY);
+    return `${spellName}(${local.x}, ${local.y})`;
 }
 
 function showTargetingCue(spellName) {
-    if (!targetingCue) return
-    targetingCue.textContent = `Targeting ${spellName}(x, y): click to cast`
-    targetingCue.hidden = false
-    document.body.classList.add('targeting-spell-active')
+    if (!targetingCue) return;
+    targetingCue.textContent = `Targeting ${spellName}(x, y): click to cast`;
+    targetingCue.hidden = false;
+    document.body.classList.add('targeting-spell-active');
 }
 
 function hideTargetingCue() {
-    if (!targetingCue) return
-    targetingCue.hidden = true
-    document.body.classList.remove('targeting-spell-active')
+    if (!targetingCue) return;
+    targetingCue.hidden = true;
+    document.body.classList.remove('targeting-spell-active');
 }
 
-function executeSpellCall(scrollId, scrollRef, parsedFunction, callText, onDone) {
-    // remove previous replay
-    document.getElementById(scrollId).querySelector('.codescroll-state-parsed .code-foot').innerHTML = "&nbsp;"
+function emitParseEvent(scrollId, spellName, scrollRef) {
+    const snapshot = scrollRef.getSnapshot();
+    emitElementalEvent('elemental:spell-parse', {
+        scrollId,
+        spellName,
+        success: snapshot.parseSuccess === true,
+        snapshot
+    });
+}
 
-    const parsed_call = parseIntoHTML(callText)
-    const trigger_viz_elem = getTriggerViz(scrollId)
-    trigger_viz_elem.innerHTML = parsed_call.html
+function executeSpellCall({
+    scrollId,
+    scrollRef,
+    parsedFunction,
+    callText,
+    spellName,
+    invokedState,
+    onDone
+}) {
+    const parsedFoot = document.getElementById(scrollId).querySelector('.codescroll-state-parsed .code-foot');
+    parsedFoot.innerHTML = '&nbsp;';
 
-    const combined_ast = structuredClone(parsedFunction.ast)
-    combined_ast.body.push(...parsed_call.ast.body)
+    const triggerVizElem = getTriggerViz(scrollId);
+    const settled = (detail) => {
+        emitElementalEvent('elemental:spell-cast-settled', detail);
+        if (onDone) onDone(detail);
+        return detail;
+    };
 
-    animateParse(trigger_viz_elem.children[0], 100, 20)
+    let parsedCall;
+    try {
+        parsedCall = parseIntoHTML(callText);
+    } catch (error) {
+        console.error(error);
+        triggerVizElem.innerHTML = '';
+        const detail = {
+            scrollId,
+            spellName,
+            ok: false,
+            error,
+            invokedState
+        };
+        emitElementalEvent('elemental:spell-cast-error', detail);
+        return Promise.resolve(settled(detail));
+    }
+
+    triggerVizElem.innerHTML = parsedCall.html;
+    const combinedAst = structuredClone(parsedFunction.ast);
+    combinedAst.body.push(...parsedCall.ast.body);
+
+    return animateParse(triggerVizElem.children[0], 100, 20)
         .then(() => {
-            let interp_speed = 0
-            if (scrollRef.getState() == "parsed") interp_speed = 250
-
-            return interpretCode(document.getElementById(scrollId), combined_ast, interp_speed, false, createMagicInitFunc(player))
+            let interpSpeed = 0;
+            if (scrollRef.getState() === 'parsed') interpSpeed = 250;
+            return interpretCode(
+                document.getElementById(scrollId),
+                combinedAst,
+                interpSpeed,
+                false,
+                createMagicInitFunc(player)
+            );
         })
         .then((result) => {
-            console.log(result)
-
-            const fullTrace = result.executionTrace;
+            const fullTrace = Array.isArray(result.executionTrace) ? result.executionTrace : [];
             const condensedTrace = fullTrace.filter(getTraceStepFilter());
             const condensedSlider = createTraceSlider(condensedTrace, document.getElementById(scrollId));
-            document.getElementById(scrollId).querySelector('.codescroll-state-parsed .code-foot').appendChild(condensedSlider)
+            parsedFoot.appendChild(condensedSlider);
+            triggerVizElem.innerHTML = '';
 
-            trigger_viz_elem.innerHTML = ''
-            if (onDone) onDone()
+            const detail = {
+                scrollId,
+                spellName,
+                ok: true,
+                result,
+                sliderElement: condensedSlider,
+                invokedState
+            };
+            emitElementalEvent('elemental:spell-cast-complete', detail);
+            return settled(detail);
         })
         .catch((error) => {
-            console.error(error)
-            trigger_viz_elem.innerHTML = ''
-            if (onDone) onDone()
-        })
+            console.error(error);
+            triggerVizElem.innerHTML = '';
+            const detail = {
+                scrollId,
+                spellName,
+                ok: false,
+                error,
+                invokedState
+            };
+            emitElementalEvent('elemental:spell-cast-error', detail);
+            return settled(detail);
+        });
 }
 
-let targetedSpellInProgress = false
-function executeTargetedSpell({ scrollId, scrollRef, parsedFunction, spellName }) {
-    if (targetedSpellInProgress) return
-    targetedSpellInProgress = true
+let targetedSpellInProgress = false;
+function executeTargetedSpell({ scrollId, scrollRef, parsedFunction, spellName, onDone }) {
+    if (targetedSpellInProgress) return false;
+    targetedSpellInProgress = true;
 
-    ensureMousePosition()
-    showTargetingCue(spellName)
-    const trigger_viz_elem = getTriggerViz(scrollId)
+    const invokedState = scrollRef.getState();
+    ensureMousePosition();
+    showTargetingCue(spellName);
+    const triggerVizElem = getTriggerViz(scrollId);
+    emitElementalEvent('elemental:spell-targeting-start', { spellName, scrollId });
 
-    function follow_mouse() {
-        trigger_viz_elem.style.left = mousex + 'px'
-        trigger_viz_elem.style.top = mousey + 'px'
-        trigger_viz_elem.textContent = getTargetedCallText(spellName, mousex, mousey)
+    function followMouse() {
+        triggerVizElem.style.left = mousex + 'px';
+        triggerVizElem.style.top = mousey + 'px';
+        triggerVizElem.textContent = getTargetedCallText(spellName, mousex, mousey);
     }
-    follow_mouse()
-    window.addEventListener('mousemove', follow_mouse)
+    followMouse();
+    window.addEventListener('mousemove', followMouse);
 
     function finalizeTarget(event) {
-        event.preventDefault()
-        event.stopPropagation()
-        mousex = event.clientX
-        mousey = event.clientY
+        event.preventDefault();
+        event.stopPropagation();
+        mousex = event.clientX;
+        mousey = event.clientY;
 
-        window.removeEventListener('mousemove', follow_mouse)
-        window.removeEventListener('click', finalizeTarget, true)
-        hideTargetingCue()
+        window.removeEventListener('mousemove', followMouse);
+        window.removeEventListener('click', finalizeTarget, true);
+        hideTargetingCue();
+        emitElementalEvent('elemental:spell-targeting-end', { spellName, scrollId });
 
-        const callText = getTargetedCallText(spellName, mousex, mousey)
-        try {
-            executeSpellCall(scrollId, scrollRef, parsedFunction, callText, () => {
-                targetedSpellInProgress = false
-            })
-        } catch (error) {
-            console.error(error)
-            targetedSpellInProgress = false
-            trigger_viz_elem.innerHTML = ''
-        }
+        const callText = getTargetedCallText(spellName, mousex, mousey);
+        executeSpellCall({
+            scrollId,
+            scrollRef,
+            parsedFunction,
+            callText,
+            spellName,
+            invokedState,
+            onDone: (detail) => {
+                targetedSpellInProgress = false;
+                if (onDone) onDone(detail);
+            }
+        }).catch((error) => {
+            console.error(error);
+            targetedSpellInProgress = false;
+            triggerVizElem.innerHTML = '';
+        });
     }
 
-    window.addEventListener('click', finalizeTarget, true)
+    window.addEventListener('click', finalizeTarget, true);
+    return true;
 }
 
-function createTargetedSpellScroll({ scrollId, spellName, body }) {
-    let spellScroll = null
-    spellScroll = createCodeScroll(`#${scrollId}`,
+function createTargetedSpellScroll({ scrollId, spellName, body, editingEnabled }) {
+    let spellScroll = null;
+    spellScroll = createCodeScroll(
+        `#${scrollId}`,
         {
             header: `function ${spellName}(x, y) {`,
             body,
-            footer: "}",
+            footer: '}',
             trigger: `${spellName}(x, y)`
-        }, {
-            initialState: "collapsed",
-            editingEnabled: false,
+        },
+        {
+            initialState: 'collapsed',
+            editingEnabled: !!editingEnabled,
             onExecute: ({ parsed }) => {
                 executeTargetedSpell({
                     scrollId,
                     scrollRef: spellScroll,
                     parsedFunction: parsed,
                     spellName
-                })
+                });
+            },
+            onTransitionComplete: ({ to }) => {
+                if (to === 'parsed') {
+                    emitParseEvent(scrollId, spellName, spellScroll);
+                }
             }
-        })
-    return spellScroll
+        }
+    );
+    return spellScroll;
 }
 
-const splashScroll = createCodeScroll("#splash-scroll",
-    {
-        header: "function splash() {",
-        body: "    water(0, 0, 100);",
-        footer: "}",
-        trigger: "splash()"
-    }, {
-        initialState: "collapsed",
-        editingEnabled: false,
-        onExecute: ({ trigger, parseSuccess, scroll, parsed }) => {
-            console.log(parsed.ast);
+function executeSplashScroll(scrollRef, parsed) {
+    const scrollId = 'splash-scroll';
+    const spellName = 'splash';
+    const invokedState = scrollRef.getState();
+    const triggerVizElem = getTriggerViz(scrollId);
 
-            const trigger_viz_elem = getTriggerViz('splash-scroll')
+    function followMouse() {
+        triggerVizElem.style.left = mousex + 'px';
+        triggerVizElem.style.top = mousey + 'px';
+    }
+    followMouse();
 
-            function follow_mouse()  {
-                trigger_viz_elem.style.left = mousex + 'px';
-                trigger_viz_elem.style.top = mousey + 'px';
-            }
-            follow_mouse()
-
-            window.addEventListener('mousemove', follow_mouse);
-            executeSpellCall('splash-scroll', splashScroll, parsed, 'splash()', () => {
-                window.removeEventListener('mousemove', follow_mouse)
-            })
+    window.addEventListener('mousemove', followMouse);
+    return executeSpellCall({
+        scrollId,
+        scrollRef,
+        parsedFunction: parsed,
+        callText: 'splash()',
+        spellName,
+        invokedState,
+        onDone: () => {
+            window.removeEventListener('mousemove', followMouse);
         }
-    })
+    });
+}
+
+const splashScroll = createCodeScroll(
+    '#splash-scroll',
+    {
+        header: 'function splash() {',
+        body: '    water(0, 0, 100);',
+        footer: '}',
+        trigger: 'splash()'
+    },
+    {
+        initialState: 'collapsed',
+        editingEnabled: false,
+        onExecute: ({ parsed }) => {
+            executeSplashScroll(splashScroll, parsed);
+        }
+    }
+);
 
 const whooshScroll = createTargetedSpellScroll({
     scrollId: 'whoosh-scroll',
     spellName: 'whoosh',
-    body: "    wind(0, 0, x, y, 100);"
-})
+    body: '    wind(0, 0, x, y, 100);',
+    editingEnabled: false
+});
 
 const putOutFireScroll = createTargetedSpellScroll({
     scrollId: 'put-out-fire-scroll',
     spellName: 'put_out_fire',
-    body:
-`    water(x, y, 100);
-    wind(0, 0, x, y, 100);`
-})
+    body: `    water(x, y, 100);
+    wind(0, 0, x, y, 100);`,
+    editingEnabled: true
+});
 
-putOutFireScroll.setEditingEnabled(true)
+const spellRegistry = {
+    splash: {
+        spellName: 'splash',
+        scrollId: 'splash-scroll',
+        scrollRef: splashScroll,
+        targeted: false
+    },
+    whoosh: {
+        spellName: 'whoosh',
+        scrollId: 'whoosh-scroll',
+        scrollRef: whooshScroll,
+        targeted: true
+    },
+    put_out_fire: {
+        spellName: 'put_out_fire',
+        scrollId: 'put-out-fire-scroll',
+        scrollRef: putOutFireScroll,
+        targeted: true
+    }
+};
+
+function setScrollVisible(spellName, visible) {
+    const record = spellRegistry[spellName];
+    if (!record) return;
+    const container = document.getElementById(record.scrollId);
+    if (!container) return;
+    container.classList.toggle('tutorial-scroll-hidden', !visible);
+}
+
+function executeSpellByName(spellName, onDone) {
+    const record = spellRegistry[spellName];
+    if (!record) return false;
+
+    const snapshot = record.scrollRef.getSnapshot();
+    if (snapshot.parseSuccess !== true) return false;
+
+    if (record.targeted) {
+        return executeTargetedSpell({
+            scrollId: record.scrollId,
+            scrollRef: record.scrollRef,
+            parsedFunction: record.scrollRef.getParsed(),
+            spellName: record.spellName,
+            onDone
+        });
+    }
+
+    executeSplashScroll(record.scrollRef, record.scrollRef.getParsed());
+    return true;
+}
+
+window.elementalSpellUi = {
+    getScroll(spellName) {
+        return spellRegistry[spellName]?.scrollRef || null;
+    },
+    getScrollContainer(spellName) {
+        const record = spellRegistry[spellName];
+        if (!record) return null;
+        return document.getElementById(record.scrollId);
+    },
+    revealScroll(spellName) {
+        setScrollVisible(spellName, true);
+    },
+    hideScroll(spellName) {
+        setScrollVisible(spellName, false);
+    },
+    setScrollVisible,
+    executeSpellByName
+};

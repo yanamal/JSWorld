@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/yanamal/VisualInterpreterJS/visualize.css">
 
     <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.2/src-min-noconflict/ace.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/lib/marked.umd.js"></script>
     <link rel="stylesheet" href="../common/codescroll.css">
     <script src="../common/codescroll.js"></script>
 
@@ -25,14 +26,23 @@
     </div>
 
     <div id="spells" style="position: absolute; left: 20px; top: 20px;z-index:2;">
-        <div id="splash-scroll" style="position: absolute"></div>
-        <div id="whoosh-scroll" style="position: absolute; top: 72px;"></div>
-        <div id="put-out-fire-scroll" style="position: absolute; top: 144px;"></div>
+        <div id="splash-scroll" class="tutorial-scroll-hidden" style="position: absolute"></div>
+        <div id="whoosh-scroll" class="tutorial-scroll-hidden" style="position: absolute; top: 72px;"></div>
+        <div id="put-out-fire-scroll" class="tutorial-scroll-hidden" style="position: absolute; top: 144px;"></div>
     </div>
 
-    <div id="wizard" style="position: fixed; scale: 50%; right:500px; bottom: 620px;width: 0;height: 0;">
+    <div id="wizard">
         <img class="wizard_body" src="../img/wizard1.png" alt="a wizard">
     </div>
+    <div id="wizardMainSpeech" class="wizard-speech wizard-speech-main" role="status" aria-live="polite" hidden></div>
+    <div id="wizardSideSpeech" class="wizard-speech wizard-speech-side" role="status" aria-live="polite" hidden></div>
+
+    <button id="testItButton" type="button" hidden>Test it!</button>
+
+    <section id="tutorialFinale" aria-live="polite" hidden>
+        <h1>To be continued...</h1>
+        <div id="tutorialFinaleBody"></div>
+    </section>
 
     <div id="coordinates">
         <div>Player: <span id="playerPos">(0, 0)</span></div>
@@ -43,5 +53,6 @@
     <script src="magic_system.js"></script>
     <script src="magic_interpreter.js"></script>
     <script src="magic_spells.js"></script>
+    <script src="tutorial_sequence.js"></script>
 </body>
 </html>
