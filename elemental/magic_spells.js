@@ -71,11 +71,94 @@ function getReadableTrace(origTrace, asts, codeSnippets) {
     // insert unicode delimeter (e.g. ★) into the code snippet at the start/end locations to indicate which part of the code was executed.
 
     // return a list of trace steps where each step has:
-    // executedCode: [code string modified with delimeters]
+    // executedCode: code string modified with delimeters
     // producedValue: step.producedValue from the original step
     // nodeType: step.activeNode.nodeType
     // exception: step.exception
 
+    const trace = Array.isArray(origTrace) ? origTrace : [];
+    const astList = Array.isArray(asts) ? asts : [];
+    const snippets = Array.isArray(codeSnippets) ? codeSnippets : [];
+
+    function walkNodes(value, onNode) {
+        if (!value) return;
+        if (Array.isArray(value)) {
+            for (const item of value) walkNodes(item, onNode);
+            return;
+        }
+        if (typeof value !== 'object') return;
+        onNode(value);
+        for (const child of Object.values(value)) {
+            walkNodes(child, onNode);
+        }
+    }
+
+    const uuidToNodeRef = new Map();
+    astList.forEach((ast, snippetIndex) => {
+        walkNodes(ast, (node) => {
+            if (!node || typeof node !== 'object') return;
+            if (node.uuid === undefined || node.uuid === null) return;
+            const key = String(node.uuid);
+            if (!uuidToNodeRef.has(key)) {
+                uuidToNodeRef.set(key, { node, snippetIndex });
+            }
+        });
+    });
+
+    function getNodeBounds(node) {
+        if (!node || typeof node !== 'object') return null;
+
+        if (Number.isInteger(node.start) && Number.isInteger(node.end)) {
+            return { start: node.start, end: node.end };
+        }
+        if (Array.isArray(node.range) && node.range.length >= 2) {
+            const start = node.range[0];
+            const end = node.range[1];
+            if (Number.isInteger(start) && Number.isInteger(end)) {
+                return { start, end };
+            }
+        }
+        if (node.loc && typeof node.loc === 'object') {
+            const start = node.loc.start && node.loc.start.offset;
+            const end = node.loc.end && node.loc.end.offset;
+            if (Number.isInteger(start) && Number.isInteger(end)) {
+                return { start, end };
+            }
+        }
+        return null;
+    }
+
+    function markExecutedCode(code, node) {
+        const text = typeof code === 'string' ? code : '';
+        const bounds = getNodeBounds(node);
+        if (!bounds) return text;
+
+        const start = Math.max(0, Math.min(text.length, bounds.start));
+        const end = Math.max(start, Math.min(text.length, bounds.end));
+        if (start === end) return text;
+
+        return `${text.slice(0, start)}★${text.slice(start, end)}★${text.slice(end)}`;
+    }
+
+    return trace.map((step) => {
+        const activeNode = step && step.activeNode ? step.activeNode : null;
+        const stepUuid = activeNode && activeNode.uuid !== undefined && activeNode.uuid !== null
+            ? String(activeNode.uuid)
+            : null;
+        const matched = stepUuid ? uuidToNodeRef.get(stepUuid) : null;
+        const snippetIndex = matched ? matched.snippetIndex : 0;
+        const snippet = snippets[snippetIndex] || '';
+        const matchedNode = matched ? matched.node : null;
+
+        return {
+            executedCode: markExecutedCode(snippet, matchedNode),
+            producedValue: step ? step.producedValue : undefined,
+            nodeType: activeNode && activeNode.nodeType
+                ? activeNode.nodeType
+                : (matchedNode && (matchedNode.nodeType || matchedNode.type)) || null,
+            exception: step ? step.exception : undefined
+        };
+    });
 }
 
 
@@ -135,9 +218,14 @@ function executeSpellCall({
             const fullTrace = Array.isArray(result.executionTrace) ? result.executionTrace : [];
             const condensedTrace = fullTrace.filter(getTraceStepFilter());
             const condensedSlider = createTraceSlider(condensedTrace, document.getElementById(scrollId));
-            console.log(condensedTrace)
-            // TODO: pipe through original spell scroll's code text (entire function).
-            readableTrace = getReadableTrace(condensedTrace, [parsedFunction.ast, parsedCall.ast], [_, callText])
+            // console.log(condensedTrace)
+            const spellCodeText = scrollRef.getSnapshot().wholeCode;
+            const readableTrace = getReadableTrace(
+                condensedTrace,
+                [parsedFunction.ast, parsedCall.ast],
+                [spellCodeText, callText]
+            );
+            console.log(readableTrace);
             parsedFoot.appendChild(condensedSlider);
             triggerVizElem.innerHTML = '';
 
