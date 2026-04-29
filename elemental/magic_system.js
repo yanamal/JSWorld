@@ -287,7 +287,13 @@ function createWater(x, y, finalRadius, onComplete) {
             requestAnimationFrame(animate);
         } else {
             // Animation complete — resume the interpreter
-            if (onComplete) onComplete();
+            const summary = `
+Made water 
+global position: (${Math.floor(x)}, ${Math.floor(y)})
+radius: ${Math.floor(finalRadius)}
+World state is now:
+${getWorldState()}`.trim()
+            if (onComplete) onComplete(summary);
         }
     }
 
@@ -342,7 +348,13 @@ function createWind(x1, y1, x2, y2, width, onComplete) {
                 windEl.remove();
                 // Resume the interpreter only after the fade-out too,
                 // so the wind visually fully disappears before next spell.
-                if (onComplete) onComplete();
+                const summary = `
+Made wind 
+from (${Math.floor(x1)}, ${Math.floor(y1)}) to (${Math.floor(x2)}, ${Math.floor(y2)})
+width: ${Math.floor(width)}
+World state is now:
+${getWorldState()}`.trim()
+                if (onComplete) onComplete(summary);
             }, 300);
         }
     }
@@ -425,6 +437,22 @@ window.countWaterPixels = () => {
     }
     return count;
 };
+
+window.getWorldState = () => {
+    const water_pixels = countWaterPixels();
+    let fire_string = 'No fires'
+    let fire_coords = ''
+    for(const f of fires) {
+        fire_coords += `(${Math.floor(f.x)}, ${Math.floor(f.y)})`
+    }
+    if(fire_coords.length > 0) {
+        fire_string = `fires at: ${fire_coords}`
+    }
+    return `
+${fire_string}
+${water_pixels} water
+`.trim()
+}
 
 // Welcome message
 console.log('%c🔮 Magic System Ready!', 'font-size: 20px; color: #7dd3fc;');

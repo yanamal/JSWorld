@@ -58,6 +58,27 @@ function emitParseEvent(scrollId, spellName, scrollRef) {
     });
 }
 
+// Take an original trace as returned by the visual interpreter, and make a more readable summary of important things in each step
+function getReadableTrace(origTrace, asts, codeSnippets) {
+    //asts and codeSnippest are both arrays of length N (usually 2) such that ast[i] has the ast that corresponds with code at codeSnippets[i].
+    // origTrace has the execution trace of executing **all** snippets together (usually funciton definition followed by funciton call)
+    // so we don't know which snippet/ast each individual part of the trace came from.
+
+    //1. for each AST, create mapping from uuid to ast node (each node already has a uuid attribute from the interpreter)
+
+    //2. For each step in the origTrace (which is an array of steps), get step.activeNode.uuid and find it in the mappings.
+    // Figure out which snippet it came from. Using the ast node's start/end characters,
+    // insert unicode delimeter (e.g. ★) into the code snippet at the start/end locations to indicate which part of the code was executed.
+
+    // return a list of trace steps where each step has:
+    // executedCode: [code string modified with delimeters]
+    // producedValue: step.producedValue from the original step
+    // nodeType: step.activeNode.nodeType
+    // exception: step.exception
+
+}
+
+
 function executeSpellCall({
     scrollId,
     scrollRef,
@@ -101,7 +122,7 @@ function executeSpellCall({
     return animateParse(triggerVizElem.children[0], 100, 20)
         .then(() => {
             let interpSpeed = 0;
-            if (scrollRef.getState() === 'parsed') interpSpeed = 250;
+            if (scrollRef.getState() === 'parsed') interpSpeed = 200;
             return interpretCode(
                 document.getElementById(scrollId),
                 combinedAst,
@@ -114,6 +135,9 @@ function executeSpellCall({
             const fullTrace = Array.isArray(result.executionTrace) ? result.executionTrace : [];
             const condensedTrace = fullTrace.filter(getTraceStepFilter());
             const condensedSlider = createTraceSlider(condensedTrace, document.getElementById(scrollId));
+            console.log(condensedTrace)
+            // TODO: pipe through original spell scroll's code text (entire function).
+            readableTrace = getReadableTrace(condensedTrace, [parsedFunction.ast, parsedCall.ast], [_, callText])
             parsedFoot.appendChild(condensedSlider);
             triggerVizElem.innerHTML = '';
 
@@ -257,8 +281,7 @@ const splashScroll = createCodeScroll(
     '#splash-scroll',
     {
         header: 'function splash() {',
-        body: '    // Create a circle of water centered around (0, 0) - my position - and with a radius of 100.\n' +
-            '    water(0, 0, 100);',
+        body: '    water(0, 0, 100);',
         footer: '}',
         trigger: 'splash()'
     },
@@ -274,18 +297,14 @@ const splashScroll = createCodeScroll(
 const whooshScroll = createTargetedSpellScroll({
     scrollId: 'whoosh-scroll',
     spellName: 'whoosh',
-    body: '    // Create a wind tunnel from (0, 0) to (x, y) with a width of 100.\n' +
-        '    wind(0, 0, x, y, 100);',
+    body: '    wind(0, 0, x, y, 100);',
     editingEnabled: false
 });
 
 const putOutFireScroll = createTargetedSpellScroll({
     scrollId: 'put-out-fire-scroll',
     spellName: 'put_out_fire',
-    body: `    // This is a comment - anything after "//" isn't part of the program, it's just here for us.
-    // Make a circle of water centered on (x, y), with a radius of 100.
-    water(x, y, 100);
-    // Make a wind tunnel from my position (0, 0) to (x, y), with a width of 100.
+    body: `    water(x, y, 100);
     wind(0, 0, x, y, 100);`,
     editingEnabled: true
 });

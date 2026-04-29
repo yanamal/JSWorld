@@ -584,6 +584,9 @@
                 extraCallback(this);
             }
             this._runTransitionCallbacks(from, to);
+
+            // get rid of any stray code tooltips (TODO: more targeted and in a more appropriate place?)
+            document.querySelector('.code-tooltip')?.remove()
         }
 
         _runTransitionCallbacks(from, to) {
