@@ -171,6 +171,9 @@ function executeSpellCall({
     invokedState,
     onDone
 }) {
+    // get world state before spell call
+    const stateBefore = getWorldState(player)
+
     const parsedFoot = document.getElementById(scrollId).querySelector('.codescroll-state-parsed .code-foot');
     parsedFoot.innerHTML = '&nbsp;';
 
@@ -219,6 +222,9 @@ function executeSpellCall({
             const condensedTrace = fullTrace.filter(getTraceStepFilter());
             const condensedSlider = createTraceSlider(condensedTrace, document.getElementById(scrollId));
             // console.log(condensedTrace)
+
+            // get readable trace, use it to call debuggy (TODO: if it's the put_out_fire spell and is incorrect?..)
+
             const spellCodeText = scrollRef.getSnapshot().wholeCode;
             const readableTrace = getReadableTrace(
                 condensedTrace,
@@ -226,6 +232,12 @@ function executeSpellCall({
                 [spellCodeText, callText]
             );
             console.log(readableTrace);
+            const fullCode = `${spellCodeText}\n${callText}`
+            if(spellName === 'put_out_fire') {
+                console.log('fetching debuggy help...')
+                fetchDebuggyHelp(stateBefore, fullCode, readableTrace, {}, null)
+            }
+
             parsedFoot.appendChild(condensedSlider);
             triggerVizElem.innerHTML = '';
 

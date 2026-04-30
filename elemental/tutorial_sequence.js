@@ -407,7 +407,7 @@ Well, of course we can! Through the magic of programming, we can create new func
         }
 
         spawnSingleTestFire() {
-            const margin = 90;
+            const margin = 200;
             const worldX = this.randomInRange(margin, window.innerWidth - margin);
             const worldY = this.randomInRange(margin, window.innerHeight - margin);
             this.spawnFireAtWorld(worldX, worldY);

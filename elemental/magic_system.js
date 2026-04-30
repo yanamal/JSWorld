@@ -178,11 +178,10 @@ class Entity {
      * 🔥 FIRE SPELL
      * Creates a fire at the relative position (x, y)
      */
-    fire(x, y) {
+    fire(x, y, onComplete) {
         const world = this.localToWorld(x, y);
-        createFire(world.x, world.y);
+        createFire(world.x, world.y, this, onComplete);
         console.log(`🔥 Fire cast at local (${x}, ${y}) → world (${Math.round(world.x)}, ${Math.round(world.y)})`);
-        // fire has no onComplete; it's handled by the setTimeout(callback, 300) in the wrapper
     }
 
     /**
@@ -191,7 +190,7 @@ class Entity {
      */
     water(x, y, r, onComplete) {
         const world = this.localToWorld(x, y);
-        createWater(world.x, world.y, r, onComplete);  // pass onComplete down
+        createWater(world.x, world.y, r, onComplete, this);  // pass onComplete down
         console.log(`💧 Water cast at local (${x}, ${y}) → world (${Math.round(world.x)}, ${Math.round(world.y)}) radius ${r}`);
     }
 
@@ -202,7 +201,7 @@ class Entity {
     wind(x1, y1, x2, y2, w, onComplete) {
         const start = this.localToWorld(x1, y1);
         const end = this.localToWorld(x2, y2);
-        createWind(start.x, start.y, end.x, end.y, w, onComplete);  // pass onComplete down
+        createWind(start.x, start.y, end.x, end.y, w, onComplete, this);  // pass onComplete down
         console.log(`💨 Wind cast from (${Math.round(start.x)}, ${Math.round(start.y)}) to (${Math.round(end.x)}, ${Math.round(end.y)}) width ${w}`);
     }
 }
@@ -210,7 +209,21 @@ class Entity {
 // ============================================
 // FIRE SYSTEM
 // ============================================
-function createFire(x, y) {
+function toSummaryCoords(worldX, worldY, entity = null) {
+    if (entity && typeof entity.worldToLocal === 'function') {
+        const local = entity.worldToLocal(worldX, worldY);
+        return {
+            x: Math.floor(local.x),
+            y: Math.floor(local.y)
+        };
+    }
+    return {
+        x: Math.floor(worldX),
+        y: Math.floor(worldY)
+    };
+}
+
+function createFire(x, y, entity = null, onComplete = null) {
     const el = document.createElement('div');
     el.className = 'fire';
     el.textContent = '🔥';
@@ -220,6 +233,13 @@ function createFire(x, y) {
 
     const fire = { x, y, element: el, radius: 20 };
     fires.push(fire);
+    const firePos = toSummaryCoords(x, y, entity);
+    const summary = `
+Made fire
+at (${firePos.x}, ${firePos.y})
+World state is now:
+${getWorldState(entity)}`.trim();
+    if (onComplete) onComplete(summary);
     return fire;
 }
 
@@ -238,7 +258,7 @@ function removeFire(fire) {
 // ============================================
 // WATER SYSTEM
 // ============================================
-function createWater(x, y, finalRadius, onComplete) {
+function createWater(x, y, finalRadius, onComplete, entity = null) {
     let currentRadius = 0;
     let lastDrawnRadius = 0;
     const expandSpeed = 200; // pixels per second
@@ -287,12 +307,13 @@ function createWater(x, y, finalRadius, onComplete) {
             requestAnimationFrame(animate);
         } else {
             // Animation complete — resume the interpreter
+            const waterPos = toSummaryCoords(x, y, entity);
             const summary = `
 Made water 
-global position: (${Math.floor(x)}, ${Math.floor(y)})
+position: (${waterPos.x}, ${waterPos.y})
 radius: ${Math.floor(finalRadius)}
 World state is now:
-${getWorldState()}`.trim()
+${getWorldState(entity)}`.trim();
             if (onComplete) onComplete(summary);
         }
     }
@@ -303,7 +324,7 @@ ${getWorldState()}`.trim()
 // ============================================
 // WIND SYSTEM
 // ============================================
-function createWind(x1, y1, x2, y2, width, onComplete) {
+function createWind(x1, y1, x2, y2, width, onComplete, entity = null) {
     const duration = 500; // ms for wind to travel
     const startTime = performance.now();
     const angle = Math.atan2(y2 - y1, x2 - x1);
@@ -348,12 +369,14 @@ function createWind(x1, y1, x2, y2, width, onComplete) {
                 windEl.remove();
                 // Resume the interpreter only after the fade-out too,
                 // so the wind visually fully disappears before next spell.
+                const startPos = toSummaryCoords(x1, y1, entity);
+                const endPos = toSummaryCoords(x2, y2, entity);
                 const summary = `
 Made wind 
-from (${Math.floor(x1)}, ${Math.floor(y1)}) to (${Math.floor(x2)}, ${Math.floor(y2)})
+from (${startPos.x}, ${startPos.y}) to (${endPos.x}, ${endPos.y})
 width: ${Math.floor(width)}
 World state is now:
-${getWorldState()}`.trim()
+${getWorldState(entity)}`.trim();
                 if (onComplete) onComplete(summary);
             }, 300);
         }
@@ -438,21 +461,24 @@ window.countWaterPixels = () => {
     return count;
 };
 
-window.getWorldState = () => {
+function getWorldState(entity = null) {
     const water_pixels = countWaterPixels();
-    let fire_string = 'No fires'
-    let fire_coords = ''
-    for(const f of fires) {
-        fire_coords += `(${Math.floor(f.x)}, ${Math.floor(f.y)})`
+    let fire_string = 'No fires';
+    let fire_coords = '';
+    for (const f of fires) {
+        const firePos = toSummaryCoords(f.x, f.y, entity);
+        fire_coords += `(${firePos.x}, ${firePos.y})`;
     }
-    if(fire_coords.length > 0) {
-        fire_string = `fires at: ${fire_coords}`
+    if (fire_coords.length > 0) {
+        fire_string = `fires at: ${fire_coords}`;
     }
     return `
 ${fire_string}
 ${water_pixels} water
-`.trim()
+`.trim();
 }
+
+window.getWorldState = getWorldState;
 
 // Welcome message
 console.log('%c🔮 Magic System Ready!', 'font-size: 20px; color: #7dd3fc;');
