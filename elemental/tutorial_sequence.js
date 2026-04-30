@@ -300,6 +300,23 @@ Well, of course we can! Through the magic of programming, we can create new func
             this.handleSpellCastComplete = (event) => {
                 const detail = event.detail || {};
                 if (!this.isCurrentStep('put-out-fire') || detail.spellName !== 'put_out_fire') return;
+
+                const putOutScroll = spellUi.getScroll('put_out_fire');
+                const trace = putOutScroll?.model?.lastTrace;
+                const lastStep = Array.isArray(trace) && trace.length > 0
+                    ? trace[trace.length - 1]
+                    : null;
+                const endedInException = !!(lastStep && lastStep.exception != null);
+                const outsideTestingContext = !this.stepState.testRunActive && !this.stepState.waitingForTestCast;
+                if (endedInException && outsideTestingContext && debuggyAssistant && putOutScroll) {
+                    debuggyAssistant.beginAssistance({
+                        stateBefore: putOutScroll.model.lastStateBeforeRun,
+                        playerCode: putOutScroll.getSnapshot().wholeCode,
+                        executionTrace: putOutScroll.model.lastTrace,
+                        parseErrorData: null
+                    });
+                }
+
                 if (this.stepState.firstReplaySeen) return;
                 if (detail.invokedState !== 'parsed') return;
 
