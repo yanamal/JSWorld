@@ -444,6 +444,8 @@ async function startOpenSequence() {
     doorElem.classList.add('open');
     await wait(280);
     scrollElem.classList.add('visible');
+
+    document.getElementById('wizard_speech').style.display = "none"
 }
 
 function onDoorInteract(event) {
