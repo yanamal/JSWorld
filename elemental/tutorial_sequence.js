@@ -635,7 +635,7 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
         showFinale() {
             this.hideSideSpeech();
             this.hideTestButton();
-            finaleBodyEl.textContent = '';
+            // finaleBodyEl.textContent = '';
             finaleEl.hidden = false;
             requestAnimationFrame(() => {
                 finaleEl.classList.add('visible');

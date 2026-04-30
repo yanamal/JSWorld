@@ -211,7 +211,7 @@ body.targeting-spell-active #playArea {
     top: 50%;
     transform: translate(-50%, -50%) scale(0.2);
     transform-origin: center;
-    width: min(560px, 86vw);
+    width: min(600px, 86vw);
     min-height: 260px;
     padding: 24px 24px 30px;
     border-radius: 14px;
