@@ -8,6 +8,15 @@
         return typeof value === 'function';
     }
 
+    function escapeHtml(text) {
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     async function fetchDebuggyHelp(
         state_before,
         player_code,
@@ -73,9 +82,10 @@
         style.textContent = `
 .debuggy-assistant {
     position: fixed;
-    right: 16px;
+    left: 8px;
     bottom: 14px;
-    width: min(440px, calc(100vw - 18px));
+    width: min(440px, calc(100vw - 12px));
+    max-width: calc(100vw - 12px);
     max-height: min(62vh, 620px);
     z-index: 220;
     color: #1f150e;
@@ -205,6 +215,18 @@
     font-weight: 700;
 }
 
+.debuggy-node-markdown p {
+    display: inline;
+    margin: 0;
+}
+
+.debuggy-node-markdown code {
+    padding: 0 3px;
+    border-radius: 4px;
+    border: 1px solid rgba(86, 61, 40, 0.35);
+    background: rgba(255, 255, 255, 0.65);
+}
+
 .debuggy-actions {
     display: flex;
     gap: 6px;
@@ -279,9 +301,9 @@
 
 @media (max-width: 760px) {
     .debuggy-assistant {
-        right: 8px;
+        left: 4px;
         bottom: 8px;
-        width: min(97vw, 440px);
+        width: min(99vw, 440px);
     }
 
     .debuggy-bubble {
@@ -301,6 +323,10 @@
             const opts = options || {};
             this.fetcher = isFn(opts.fetcher) ? opts.fetcher : fetchDebuggyHelp;
             this.container = opts.container || document.body;
+            this.treeIndentPx = 18;
+            this.minInnermostNodeWidthPx = 300;
+            this.bubbleOverheadPx = 96;
+            this.avatarOverheadPx = 54;
             this.visible = false;
             this.loading = false;
             this.tree = [];
@@ -318,6 +344,8 @@
 
             ensureDebuggyStyles();
             this.mount();
+            this.boundResize = () => this._updateLayoutWidth();
+            window.addEventListener('resize', this.boundResize);
             this.render();
         }
 
@@ -349,8 +377,8 @@
             bubble.appendChild(header);
             bubble.appendChild(status);
             bubble.appendChild(tree);
-            shell.appendChild(avatar);
             shell.appendChild(bubble);
+            shell.appendChild(avatar);
             root.appendChild(shell);
             this.container.appendChild(root);
 
@@ -421,6 +449,52 @@
                     console.error('[debuggy] listener error:', error);
                 }
             }
+        }
+
+        _getMaxTreeDepth(nodes, depth) {
+            const list = Array.isArray(nodes) ? nodes : [];
+            let maxDepth = depth;
+            for (const node of list) {
+                const childDepth = this._getMaxTreeDepth(node.children || [], depth + 1);
+                if (childDepth > maxDepth) {
+                    maxDepth = childDepth;
+                }
+            }
+            return maxDepth;
+        }
+
+        _getDesiredRootWidthPx() {
+            const maxDepth = this._getMaxTreeDepth(this.tree, 0);
+            const required = this.minInnermostNodeWidthPx
+                + (maxDepth * this.treeIndentPx)
+                + this.bubbleOverheadPx
+                + this.avatarOverheadPx;
+            const minBase = 440;
+            return Math.max(minBase, required);
+        }
+
+        _updateLayoutWidth() {
+            if (!this.rootEl) return;
+            const desired = this._getDesiredRootWidthPx();
+            const viewportCap = Math.max(320, window.innerWidth - 12);
+            const finalWidth = Math.min(desired, viewportCap);
+            this.rootEl.style.width = `${finalWidth}px`;
+        }
+
+        _renderMarkdownInline(markdownText) {
+            const input = String(markdownText || '');
+            if (window.marked) {
+                if (isFn(window.marked.parseInline)) {
+                    return window.marked.parseInline(input);
+                }
+                if (isFn(window.marked.parse)) {
+                    const block = window.marked.parse(input);
+                    return String(block || '')
+                        .replace(/^\s*<p>/, '')
+                        .replace(/<\/p>\s*$/, '');
+                }
+            }
+            return escapeHtml(input);
         }
 
         getCodeStateKey(playerCode) {
@@ -687,7 +761,7 @@
         renderNode(node, depth) {
             const wrapper = document.createElement('div');
             wrapper.className = 'debuggy-node-wrap';
-            wrapper.style.marginLeft = `${depth * 18}px`;
+            wrapper.style.marginLeft = depth > 0 ? `${this.treeIndentPx}px` : '0px';
 
             const button = document.createElement('button');
             button.type = 'button';
@@ -703,7 +777,8 @@
             label.textContent = node.type === 'clue' ? '🔎 Clue' : '❓ Question';
 
             const textSpan = document.createElement('span');
-            textSpan.textContent = `#${node.id}: ${node.text}`;
+            textSpan.className = 'debuggy-node-markdown';
+            textSpan.innerHTML = `#${node.id}: ${this._renderMarkdownInline(node.text)}`;
 
             button.appendChild(label);
             button.appendChild(textSpan);
@@ -796,6 +871,7 @@
 
             this.rootEl.classList.toggle('debuggy-visible', this.visible);
             this.renderStatus();
+            this._updateLayoutWidth();
 
             this.treeEl.innerHTML = '';
             this.treeEl.removeEventListener('click', this.boundTreeClick);
