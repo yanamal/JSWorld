@@ -185,8 +185,8 @@ body.targeting-spell-active #playArea {
 
 #testItButton {
     position: fixed;
-    left: 20px;
-    bottom: 24px;
+    right: 20px;
+    top: 24px;
     z-index: 145;
     border: 2px solid #176539;
     border-radius: 8px;
@@ -479,6 +479,7 @@ body.targeting-spell-active #playArea {
 .axis-legend .y-label { color: rgba(100, 255, 100, 0.9); }
 
 #coordinates {
+    visibility: hidden;
     position: fixed;
     top: 20px;
     right: 20px;
@@ -532,9 +533,10 @@ body.targeting-spell-active #playArea {
         font-size: 12px;
     }
 
+    /*TODO: why is this duplicate here?*/
     #testItButton {
-        left: 12px;
-        bottom: 14px;
+        right: 12px;
+        top: 14px;
         padding: 8px 12px;
         font-size: 18px;
     }
