@@ -648,7 +648,7 @@
                 this._emit('assistance-skip', { mode: 'node', nodeId: activeNode.id, reason: 'busy' });
                 return;
             }
-            this.setLoading(true, '🐥 Thinking about that branch...');
+            this.setLoading(true, '🐥 Thinking about that insight...');
             this._emit('assistance-start', {
                 mode: 'node',
                 nodeId: activeNode.id,
@@ -883,7 +883,7 @@
                 empty.className = 'debuggy-empty';
                 empty.textContent = this.loading
                     ? 'Waiting for initial clues...'
-                    : 'Run a failing test or ask for help on a node to build a deduction tree.';
+                    : 'I\'ll jump in when I see that you have errors, or that the test didn\'t work.'
                 this.treeEl.appendChild(empty);
                 return;
             }

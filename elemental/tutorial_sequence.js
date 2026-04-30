@@ -35,18 +35,18 @@ That's great, but now there are lots of puddles. I'll give you another function:
         step3: `
 Wouldn't it be convenient if we could make up a new spell that would put out the fire and clean it up all at once?
 
-Well, of course we can! Through the magic of programming, we can create new functions that do as many things as we like. Actually, I started writing this spell but then got distracted and it doesn't quite work right. 
+Well, of course we can! Through the ✨magic of programming✨, we can create new functions that do as many things as we like. Actually, I started writing this spell but then got distracted and it doesn't quite work right. 
 
 **See if you can fix the \`put_out_fire\` spell!** Edit it and click \`✓\`. When you think it's ready, click "**Play with fire!**" and I'll create some fire to test it with.
 `
     };
 
     const SIDE_TEXT = {
-        playWithFire: "When you think you've got `put_out_fire` working right, click \"**Play with fire!**\" — I'll spawn some fire to put out.",
+        playWithFire: "Oh! And here is a very clever Rubber Ducky (played in this demo by a baby-chick emoji) who will help you debug when things go wrong!",
         parseOrExecutionError: 'Hmm, something went wrong there.',
-        parseSuccess: "The function parsed! That means the code didn't have any errors in it. You can use the \" ▶ \" button to call the function. " +
-            "In this view, it will show you what happens step-by-step!",
-        replay: 'In this view, after you call the function, you can examine what happened using the instant replay. \n (you can do this with `whoosh` and `splash` too, now!)',
+        parseSuccess: "The function parsed! That means the code didn't have any errors in it. \nIn this view, you can use the \" ▶ \" button to call the function. " +
+            "It will show you what happens step-by-step as it runs!",
+        replay: 'After you call the function with \" ▶ \", you can examine what happened using the instant replay. \n (you can do this with `whoosh` and `splash` too, now!)',
         firesLeft: 'Hmm, looks like you missed the fire...',
         waterLeft: 'Not bad, but I still see some water left over!',
     };
@@ -208,7 +208,7 @@ Well, of course we can! Through the magic of programming, we can create new func
                         if (debuggyAssistant) {
                             debuggyAssistant.setVisible(true);
                             debuggyAssistant.setStatus(
-                                '🐥 I am your debugging ducky. I will help you build a deduction tree when tests fail.',
+                                '🐥 I am your Rubber Ducky Bug Consulting Detective! I will help you investigate when things go wrong.',
                                 false
                             );
                         }
