@@ -6,7 +6,7 @@
     --speech-right: 240px;
     --speech-bottom: 360px;
     --code-right: 240px;
-    --code-bottom: 450px;
+    --code-bottom: 500px;
 }
 
 * {
@@ -225,7 +225,24 @@ dialog.annoying-dialog {
     margin: auto;
     width: fit-content;
     height: fit-content;
-    z-index: 30;
+    z-index: 5;
+    font-family: sans-serif;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.32);
+    padding: 0;
+    border-radius: 8px;
+}
+
+
+dialog.annoying-dialog .heading {
+    padding: 5px;
+    background-color: aliceblue;
+    border-bottom: 1px solid lightslategray;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+}
+
+dialog.annoying-dialog .body {
+    padding: 10px;
 }
 
 @media (max-width: 1200px) {

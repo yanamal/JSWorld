@@ -33,32 +33,35 @@
         </div>
     </div>
 
+    <div id="popups" style="z-index: -1"></div>
+
     <div id="test_buttons" hidden>
         <button onclick="start_popups()">Start popups</button>
         <button onclick="runRemovePopups()">Start removal</button>
     </div>
 
-    <div id="test_div">
-    <pre id="code_viz" hidden></pre>
-    </div>
 
     <div id="wizard" aria-hidden="true">
         <img class="wizard_body" src="../img/wizard1.png" alt="a wizard">
         <img id="wand" src="../img/wand1.png" alt="a hand with a wand">
     </div>
 
-    <div id="wizard_speech" role="status" aria-live="polite" hidden></div>
+    <div id="wizard_speech" role="status" aria-live="polite" hidden style="z-index: 10"></div>
 
-    <div id="popups"></div>
+    <div id="test_div" style="z-index: 30">
+    <pre id="code_viz" hidden></pre>
+    </div>
 
     <script>
         document.getElementById('scroll-text').innerHTML = marked.parse(`
-- It might break. (quota, bugs)
-- Yes, I'm sure it's too slow, too fast, backwards, not signposted enough, missing "quality-of-life" features.
-- Vertical slice - not necessarily the exact teaching sequence (need to test) (No, I don't know that this is the exact...)
-- There is no state!
+Hello!
 
-Functionality is the focus: precise visual metaphors; bespoke worlds/situations for concepts; **intelligent**(ly designed) AI assistance.
+This is a small **proof-of-concept** demo for a game that teaches programming. The focus is on demonstrating the **functionality** of a few interesting new ideas. It is definitely not a fully featured polished game! In particular:
+
+- Yes, I'm sure it's too slow, too fast, backwards, not signposted enough, missing "quality-of-life" features.
+- **It might break.** There are probably bugs. I might run out of quota in the LLM I'm using.
+- **There is no state!** Everything is extremely ephemeral. Nothing is remembered across page loads. The debugging assistant resets beteween code runs.
+- **Design choices are not final.** Why are the spells synchonous? How did I pick when the debugging ducky appears (or not)? Why is the spell UI like this? I dunno, these seemed like good first approximations to start testing with.
 
 Click anywhere on this scroll to continue!
         `);

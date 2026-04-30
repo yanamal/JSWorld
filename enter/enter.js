@@ -21,6 +21,15 @@ function wait(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const popup_options = [
+    "Are you sure?",
+    "Do you really want to enter this door?",
+    "Be careful, you might learn something!",
+    "Why?",
+    "Hey, whatcha doing?",
+    "Please agree to everything before continuing"
+]
+
 function make_popup() {
     if (num_popups > 0) {
         num_popups -= 1;
@@ -28,7 +37,10 @@ function make_popup() {
         let top = Math.round(Math.random() * 2 * max_shift - max_shift);
         let left = Math.round(Math.random() * 2 * max_shift - max_shift);
         document.getElementById('popups').insertAdjacentHTML('beforeend',
-            `<dialog class="annoying-dialog" style="top:${top}px;left:${left}px" open>Hello this is an annoying pop-up</dialog>`);
+            ` <dialog class="annoying-dialog" style="top:${top}px;left:${left}px" open>
+                      <div class="heading">Hello this is an annoying pop-up</div>
+                      <div class="body">${ popup_options[Math.floor(Math.random() * popup_options.length)]}</div>
+                    </dialog>`);
         setTimeout(make_popup, popup_delay);
         popup_delay /= 2;
     }
@@ -404,7 +416,7 @@ async function startUnlockSequence() {
     await wait(WIZARD_INTRO_DELAY_MS);
 
     wizardElem.classList.add('visible');
-    showSpeech('Whoops! Hang on, let me fix that!');
+    showSpeech('Oh no, somebody has booby trapped the door with annoying pop-ups! Hang on, let me fix that!');
 
     await wait(250);
     wandElem.style.transition = `transform ${WAND_RAISE_MS}ms cubic-bezier(0.17, 0.84, 0.26, 1)`;
@@ -419,7 +431,7 @@ async function startUnlockSequence() {
         codeVizElem.hidden = true;
     }
 
-    showSpeech('There, that\'s better. Now you can open the door to the magical world of programming!');
+    showSpeech('There, that\'s better. Now you can open the door to the ✨magical world of programming✨!');
     stopWandOscillationAndLower();
     unlockComplete = true;
 }
