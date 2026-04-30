@@ -407,7 +407,7 @@ Well, of course we can! Through the magic of programming, we can create new func
         }
 
         spawnSingleTestFire() {
-            const margin = 200;
+            const margin = 400;
             const worldX = this.randomInRange(margin, window.innerWidth - margin);
             const worldY = this.randomInRange(margin, window.innerHeight - margin);
             this.spawnFireAtWorld(worldX, worldY);
@@ -495,7 +495,7 @@ Well, of course we can! Through the magic of programming, we can create new func
         }
 
         handleTestCastResult(detail) {
-            const water_tolerance = 200;
+            const water_tolerance = 200; // max. tolerable water remaining
             if (!this.stepState.waitingForTestCast) return;
 
             this.stepState.waitingForTestCast = false;
@@ -515,6 +515,18 @@ Well, of course we can! Through the magic of programming, we can create new func
                 this.showSideSpeech(SIDE_TEXT.waterLeft);
             }
 
+            // Test was not successful - call debuggy
+            // TODO: possibly pass scroll reference around instead of hard-coding the put_out_fire scroll (then again, there is arguably too much passing known things around already)
+            fetchDebuggyHelp(
+                putOutFireScroll.model.lastStateBeforeRun,
+                putOutFireScroll.model.wholeCode,
+                putOutFireScroll.model.lastTrace,
+                {},
+                null
+            )
+
+
+            // clear fire and water from screen
             if (typeof window.clearWater === 'function') {
                 window.clearWater();
             }

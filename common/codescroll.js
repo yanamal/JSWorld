@@ -258,7 +258,9 @@
                 currentState: "collapsed",
                 parsed: null,
                 parseSuccess: null,
-                lastWholeCode: null
+                lastWholeCode: null,
+                lastTrace: null,
+                lastStateBeforeRun: null
             };
             this._transitionChain = Promise.resolve();
             this._buildDom();

@@ -172,7 +172,7 @@ function executeSpellCall({
     onDone
 }) {
     // get world state before spell call
-    const stateBefore = getWorldState(player)
+    scrollRef.model.lastStateBeforeRun = getWorldState(player)
 
     const parsedFoot = document.getElementById(scrollId).querySelector('.codescroll-state-parsed .code-foot');
     parsedFoot.innerHTML = '&nbsp;';
@@ -232,11 +232,13 @@ function executeSpellCall({
                 [spellCodeText, callText]
             );
             console.log(readableTrace);
-            const fullCode = `${spellCodeText}\n${callText}`
-            if(spellName === 'put_out_fire') {
-                console.log('fetching debuggy help...')
-                fetchDebuggyHelp(stateBefore, fullCode, readableTrace, {}, null)
-            }
+            scrollRef.model.lastTrace = readableTrace;
+            //
+            // const fullCode = `${spellCodeText}\n${callText}`
+            // if(spellName === 'put_out_fire') {
+            //     console.log('fetching debuggy help...')
+            //     fetchDebuggyHelp(stateBefore, fullCode, readableTrace, {}, null)
+            // }
 
             parsedFoot.appendChild(condensedSlider);
             triggerVizElem.innerHTML = '';
