@@ -12,6 +12,9 @@
     const testButtonEl = document.getElementById('testItButton');
     const finaleEl = document.getElementById('tutorialFinale');
     const finaleBodyEl = document.getElementById('tutorialFinaleBody');
+    const debuggyAssistant = typeof window.createDebuggyAssistant === 'function'
+        ? window.createDebuggyAssistant()
+        : null;
 
     const STEP_TEXT = {
         step0: `
@@ -151,6 +154,13 @@ Well, of course we can! Through the magic of programming, we can create new func
                         spellUi.revealScroll('put_out_fire');
                         this.showMainSpeech(STEP_TEXT.step3);
                         this.showTestButton();
+                        if (debuggyAssistant) {
+                            debuggyAssistant.setVisible(true);
+                            debuggyAssistant.setStatus(
+                                '🐥 I am your debugging ducky. I will help you build a deduction tree when tests fail.',
+                                false
+                            );
+                        }
 
                         const putOutScroll = spellUi.getScroll('put_out_fire');
                         if (putOutScroll) {
@@ -515,15 +525,15 @@ Well, of course we can! Through the magic of programming, we can create new func
                 this.showSideSpeech(SIDE_TEXT.waterLeft);
             }
 
-            // Test was not successful - call debuggy
-            // TODO: possibly pass scroll reference around instead of hard-coding the put_out_fire scroll (then again, there is arguably too much passing known things around already)
-            fetchDebuggyHelp(
-                putOutFireScroll.model.lastStateBeforeRun,
-                putOutFireScroll.model.wholeCode,
-                putOutFireScroll.model.lastTrace,
-                {},
-                null
-            )
+            // Test was not successful - begin or continue debugging assistant flow.
+            const putOutScroll = spellUi.getScroll('put_out_fire');
+            if (debuggyAssistant && putOutScroll) {
+                debuggyAssistant.beginAssistance({
+                    stateBefore: putOutScroll.model.lastStateBeforeRun,
+                    playerCode: putOutScroll.getSnapshot().wholeCode,
+                    executionTrace: putOutScroll.model.lastTrace
+                });
+            }
 
 
             // clear fire and water from screen
