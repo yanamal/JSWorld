@@ -8,8 +8,22 @@
         return typeof value === 'function';
     }
 
-    async function fetchDebuggyHelp(state_before, player_code, execution_trace, deduction_tree, active_node) {
-        const stateData = { state_before, player_code, execution_trace, deduction_tree, active_node };
+    async function fetchDebuggyHelp(
+        state_before,
+        player_code,
+        execution_trace,
+        deduction_tree,
+        active_node,
+        parse_error_data = null
+    ) {
+        const stateData = {
+            state_before,
+            player_code,
+            execution_trace,
+            deduction_tree,
+            active_node,
+            parse_error_data
+        };
 
         try {
             const res = await fetch(DEBUGGY_WORKER_URL, {
@@ -297,8 +311,10 @@
             this.sessionContext = {
                 stateBefore: null,
                 playerCode: '',
-                executionTrace: null
+                executionTrace: null,
+                parseErrorData: null
             };
+            this.listeners = new Map();
 
             ensureDebuggyStyles();
             this.mount();
@@ -346,12 +362,17 @@
         setVisible(visible) {
             this.visible = !!visible;
             this.rootEl.classList.toggle('debuggy-visible', this.visible);
+            this._emit('visibility-change', { visible: this.visible });
         }
 
         setStatus(text, isError) {
             this.statusText = String(text || '');
             this.statusIsError = !!isError;
             this.renderStatus();
+            this._emit('status-change', {
+                text: this.statusText,
+                isError: this.statusIsError
+            });
         }
 
         renderStatus() {
@@ -367,6 +388,39 @@
                 this.setStatus(message || '🐥 Looking for more clues...', false);
             }
             this.render();
+            this._emit('loading-change', { loading: this.loading });
+        }
+
+        on(eventName, handler) {
+            if (!eventName || !isFn(handler)) return () => {};
+            const key = String(eventName);
+            if (!this.listeners.has(key)) {
+                this.listeners.set(key, new Set());
+            }
+            this.listeners.get(key).add(handler);
+            return () => this.off(key, handler);
+        }
+
+        off(eventName, handler) {
+            const key = String(eventName || '');
+            const bucket = this.listeners.get(key);
+            if (!bucket) return;
+            bucket.delete(handler);
+            if (bucket.size === 0) {
+                this.listeners.delete(key);
+            }
+        }
+
+        _emit(eventName, payload) {
+            const bucket = this.listeners.get(String(eventName || ''));
+            if (!bucket || bucket.size === 0) return;
+            for (const handler of bucket) {
+                try {
+                    handler(payload || {});
+                } catch (error) {
+                    console.error('[debuggy] listener error:', error);
+                }
+            }
         }
 
         getCodeStateKey(playerCode) {
@@ -378,6 +432,7 @@
             this.selectedNodeId = null;
             this.composerState = null;
             this.nextNodeId = 1;
+            this._emit('tree-update', { tree: this.getTreeSnapshot(), reason: 'reset' });
         }
 
         ensureNextNodeId() {
@@ -447,6 +502,10 @@
         }
 
         async beginAssistance(context) {
+            if (this.loading) {
+                this._emit('assistance-skip', { mode: 'root', reason: 'busy' });
+                return;
+            }
             const playerCode = String(context?.playerCode || '');
             const codeKey = this.getCodeStateKey(playerCode);
             const isNewCodeState = codeKey !== this.lastCodeStateKey;
@@ -459,12 +518,18 @@
             this.sessionContext = {
                 stateBefore: context?.stateBefore,
                 playerCode,
-                executionTrace: context?.executionTrace || null
+                executionTrace: context?.executionTrace || null,
+                parseErrorData: context?.parseErrorData || null
             };
 
             this.lastCodeStateKey = codeKey;
             this.setVisible(true);
             this.setLoading(true, '🐥 Searching for clues...');
+            this._emit('assistance-start', {
+                mode: 'root',
+                isNewCodeState,
+                hasParseErrorData: !!this.sessionContext.parseErrorData
+            });
 
             try {
                 const data = await this.fetcher(
@@ -472,7 +537,8 @@
                     this.sessionContext.playerCode,
                     this.sessionContext.executionTrace,
                     requestTree,
-                    null
+                    null,
+                    this.sessionContext.parseErrorData
                 );
 
                 const content = getDebuggyMessageContent(data);
@@ -489,8 +555,14 @@
                     this.setStatus('🐥 Added more top-level clues from the latest test.', false);
                 }
                 this.ensureNextNodeId();
+                this._emit('tree-update', { tree: this.getTreeSnapshot(), reason: 'root-assistance' });
+                this._emit('assistance-success', {
+                    mode: 'root',
+                    addedCount: nodes.length
+                });
             } catch (error) {
                 this.setStatus('🐥 I could not reach the helper endpoint right now.', true);
+                this._emit('assistance-error', { mode: 'root', error });
             } finally {
                 this.setLoading(false);
             }
@@ -498,14 +570,24 @@
 
         async requestHelpForNode(activeNode) {
             if (!activeNode) return;
+            if (this.loading) {
+                this._emit('assistance-skip', { mode: 'node', nodeId: activeNode.id, reason: 'busy' });
+                return;
+            }
             this.setLoading(true, '🐥 Thinking about that branch...');
+            this._emit('assistance-start', {
+                mode: 'node',
+                nodeId: activeNode.id,
+                hasParseErrorData: !!this.sessionContext.parseErrorData
+            });
             try {
                 const data = await this.fetcher(
                     this.sessionContext.stateBefore,
                     this.sessionContext.playerCode,
                     this.sessionContext.executionTrace,
                     this.getTreeSnapshot(),
-                    activeNode
+                    activeNode,
+                    this.sessionContext.parseErrorData
                 );
                 const content = getDebuggyMessageContent(data);
                 const taggedItems = parseDebuggyTaggedItems(content);
@@ -517,8 +599,19 @@
                     this.setStatus('🐥 Added new clues on this branch.', false);
                 }
                 this.ensureNextNodeId();
+                this._emit('tree-update', {
+                    tree: this.getTreeSnapshot(),
+                    reason: 'node-assistance',
+                    nodeId: activeNode.id
+                });
+                this._emit('assistance-success', {
+                    mode: 'node',
+                    nodeId: activeNode.id,
+                    addedCount: nodes.length
+                });
             } catch (error) {
                 this.setStatus('🐥 I could not fetch more help right now.', true);
+                this._emit('assistance-error', { mode: 'node', nodeId: activeNode.id, error });
             } finally {
                 this.setLoading(false);
             }
@@ -539,6 +632,12 @@
             parentNode.children.push(newNode);
             this.selectedNodeId = newNode.id;
             this.composerState = null;
+            this._emit('tree-update', {
+                tree: this.getTreeSnapshot(),
+                reason: 'user-add',
+                nodeId: newNode.id,
+                parentNodeId
+            });
             this.render();
 
             await this.requestHelpForNode(newNode);
@@ -555,6 +654,7 @@
             this.selectedNodeId = nodeId;
             this.composerState = null;
             this.setStatus('🐥 Choose an action for this clue/question.', false);
+            this._emit('node-selected', { nodeId });
             this.render();
         }
 
@@ -564,11 +664,13 @@
             if (!node) return;
 
             if (action === 'get-help') {
+                this._emit('action', { action, nodeId: node.id });
                 this.requestHelpForNode(node).then(() => this.render());
                 return;
             }
 
             if (action === 'add-clue' || action === 'add-question') {
+                this._emit('action', { action, nodeId: node.id });
                 const type = action === 'add-clue' ? 'clue' : 'question';
                 this.composerState = { parentNodeId: nodeId, type, text: '' };
                 this.setStatus(type === 'clue' ? 'Add your clue and submit.' : 'Add your question and submit.', false);

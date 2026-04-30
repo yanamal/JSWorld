@@ -59,6 +59,7 @@ function emitParseEvent(scrollId, spellName, scrollRef) {
 }
 
 // Take an original trace as returned by the visual interpreter, and make a more readable summary of important things in each step
+// TODO:this should really be general to codeScroll, but the logic is currently specific to the execution nuances in here.
 function getReadableTrace(origTrace, asts, codeSnippets) {
     //asts and codeSnippest are both arrays of length N (usually 2) such that ast[i] has the ast that corresponds with code at codeSnippets[i].
     // origTrace has the execution trace of executing **all** snippets together (usually funciton definition followed by funciton call)
@@ -161,6 +162,39 @@ function getReadableTrace(origTrace, asts, codeSnippets) {
     });
 }
 
+// TODO: update and use visual interpreter library
+function getFixedTraceStepFilter(
+    include_produced_value=true, // this step completed evaluating a node AND the evaluation returned a value
+    include_exception=true, // this step produces an exception
+    include_completed_node=true, // this step completed evaluating a node (regardless of whether the evaluation produced an explicit return value)
+    include_side_effects=true, // this step did something that's considered a "side effect", e.g. changing the value of a variable
+    include_pushed_node=false, // this step was a partial evaluation of a "parent" node that ended with pushing a child node onto the state stack
+    exclude_types=['ExpressionStatement', 'BlockStatement']
+    ) {
+    // Note: the order of these return checks depends somewhat on how the different possible types of states relate to each other, and what seems to make sense to include/exclude
+    // It's probably fine.
+    return function(stepResult){
+        if(exclude_types.includes(stepResult.activeNode.nodeType)) {
+            return false;
+        }
+        if(include_exception && stepResult.exception) {
+            return true;
+        }
+        if(include_completed_node && stepResult.completedNode) {
+            return true;
+        }
+        if(include_produced_value && stepResult.producedValue) {
+            return true;
+        }
+        if(include_side_effects && stepResult.hasSideEffect) {
+            return true;
+        }
+        if(include_pushed_node && stepResult.pushedNode) {
+            return true;
+        }
+        return false;
+    }
+}
 
 function executeSpellCall({
     scrollId,
@@ -219,7 +253,7 @@ function executeSpellCall({
         })
         .then((result) => {
             const fullTrace = Array.isArray(result.executionTrace) ? result.executionTrace : [];
-            const condensedTrace = fullTrace.filter(getTraceStepFilter());
+            const condensedTrace = fullTrace.filter(getFixedTraceStepFilter());
             const condensedSlider = createTraceSlider(condensedTrace, document.getElementById(scrollId));
             // console.log(condensedTrace)
 

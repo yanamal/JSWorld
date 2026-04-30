@@ -957,6 +957,43 @@
             return this.model.currentState;
         }
 
+        getParseErrorData() {
+            const snapshotParsed = this.model.parsed || null;
+            const parserErrorMessage = snapshotParsed && snapshotParsed.error && snapshotParsed.error.message
+                ? String(snapshotParsed.error.message)
+                : null;
+
+            let aceAnnotations = null;
+            let aceErrorMessage = null;
+            if (this.aceEditor && this.aceEditor.session && isFn(this.aceEditor.session.getAnnotations)) {
+                const raw = this.aceEditor.session.getAnnotations();
+                if (Array.isArray(raw)) {
+                    aceAnnotations = raw.map((item) => ({
+                        row: Number.isFinite(item?.row) ? item.row : null,
+                        column: Number.isFinite(item?.column) ? item.column : null,
+                        type: item?.type ? String(item.type) : null,
+                        text: item?.text ? String(item.text) : null
+                    }));
+
+                    const errorLike = aceAnnotations.find((ann) => {
+                        const t = String(ann.type || '').toLowerCase();
+                        return t === 'error' || t === 'fatal';
+                    });
+                    const first = errorLike || aceAnnotations[0] || null;
+                    aceErrorMessage = first && first.text ? first.text : null;
+                }
+            }
+
+            return {
+                parse_success: this.model.parseSuccess === true,
+                parser_error_message: parserErrorMessage,
+                parser_error: snapshotParsed && snapshotParsed.error ? snapshotParsed.error : null,
+                ace_error_message: aceErrorMessage,
+                ace_annotations: aceAnnotations,
+                whole_code: this.model.lastWholeCode || this.getWholeCode()
+            };
+        }
+
         getSnapshot() {
             return {
                 header: this.model.header,
@@ -967,7 +1004,8 @@
                 currentState: this.model.currentState,
                 parsed: this.model.parsed,
                 parseSuccess: this.model.parseSuccess,
-                wholeCode: this.model.lastWholeCode || this.getWholeCode()
+                wholeCode: this.model.lastWholeCode || this.getWholeCode(),
+                parseErrorData: this.getParseErrorData()
             };
         }
 

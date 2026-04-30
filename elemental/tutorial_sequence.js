@@ -66,6 +66,57 @@ Well, of course we can! Through the magic of programming, we can create new func
         el.hidden = false;
     }
 
+    function getAceParseDiagnostics(scrollRef) {
+        if (!scrollRef || !scrollRef.aceEditor || !scrollRef.aceEditor.session) {
+            return { annotations: null, message: null };
+        }
+        const session = scrollRef.aceEditor.session;
+        if (typeof session.getAnnotations !== 'function') {
+            return { annotations: null, message: null };
+        }
+        const raw = session.getAnnotations();
+        if (!Array.isArray(raw)) {
+            return { annotations: null, message: null };
+        }
+
+        const annotations = raw.map((item) => ({
+            row: Number.isFinite(item?.row) ? item.row : null,
+            column: Number.isFinite(item?.column) ? item.column : null,
+            type: item?.type ? String(item.type) : null,
+            text: item?.text ? String(item.text) : null
+        }));
+
+        const errorLike = annotations.find((ann) => {
+            const t = String(ann.type || '').toLowerCase();
+            return t === 'error' || t === 'fatal';
+        });
+        const first = errorLike || annotations[0] || null;
+        return {
+            annotations,
+            message: first && first.text ? first.text : null
+        };
+    }
+
+    function buildParseErrorData(scrollRef, detail) {
+        const snapshot = detail?.snapshot || (scrollRef && typeof scrollRef.getSnapshot === 'function'
+            ? scrollRef.getSnapshot()
+            : null);
+        const snapshotData = snapshot?.parseErrorData || null;
+        const parserErrorObj = snapshot?.parsed?.error || snapshotData?.parser_error || null;
+        const parserErrorMessage = parserErrorObj?.message || snapshotData?.parser_error_message || null;
+        const ace = getAceParseDiagnostics(scrollRef);
+
+        return {
+            source: 'elemental-put-out-fire-parse',
+            spell_name: 'put_out_fire',
+            parser_error_message: parserErrorMessage ? String(parserErrorMessage) : null,
+            parser_error: parserErrorObj,
+            ace_error_message: ace.message || snapshotData?.ace_error_message || null,
+            ace_annotations: ace.annotations || snapshotData?.ace_annotations || null,
+            whole_code: snapshot?.wholeCode || snapshotData?.whole_code || null
+        };
+    }
+
     class TutorialSequence {
         constructor() {
             this.currentStepIndex = -1;
@@ -217,6 +268,18 @@ Well, of course we can! Through the magic of programming, we can create new func
                         this.getSpellControl('put_out_fire', '.codescroll-state-parsed .codescroll-edit-btn'),
                         ['click']
                     );
+                }
+
+                if (!detail.success) {
+                    const putOutScroll = spellUi.getScroll('put_out_fire');
+                    if (debuggyAssistant && putOutScroll) {
+                        debuggyAssistant.beginAssistance({
+                            stateBefore: putOutScroll.model.lastStateBeforeRun || null,
+                            playerCode: putOutScroll.getSnapshot().wholeCode,
+                            executionTrace: null,
+                            parseErrorData: buildParseErrorData(putOutScroll, detail)
+                        });
+                    }
                 }
             };
 
@@ -531,7 +594,8 @@ Well, of course we can! Through the magic of programming, we can create new func
                 debuggyAssistant.beginAssistance({
                     stateBefore: putOutScroll.model.lastStateBeforeRun,
                     playerCode: putOutScroll.getSnapshot().wholeCode,
-                    executionTrace: putOutScroll.model.lastTrace
+                    executionTrace: putOutScroll.model.lastTrace,
+                    parseErrorData: null
                 });
             }
 
