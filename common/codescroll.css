@@ -4,6 +4,10 @@
     vertical-align: top;
 }
 
+.codescroll>div {
+    font-family: 'Consolas', monospace;
+}
+
 .codescroll .codescroll-state {
     position: relative;
     overflow: visible;
@@ -21,8 +25,23 @@
     z-index: 100;
 }
 
+.codescroll .codescroll-state-parsed .code-wrapper {
+    white-space: pre;
+}
+
 .codescroll .code-head {
+    position: relative;
     overflow: hidden;
+    border-radius: 10px 10px 10px 10px / 50% 50% 50% 50%;
+    border: 2px solid #8f7032;
+    margin: 0;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    width: calc(100% + 20px);
+    left: -10px;
+    background:
+        linear-gradient(to bottom, #b7a575 0%, #f5ebcc 50%, #e7d5a5 100%);
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.5);
 }
 
 .codescroll .code-head.codescroll-execute-disabled {
@@ -44,6 +63,27 @@
     min-height: 30px;
     padding-top: 8px;
     padding-bottom: 8px;
+    border-right: 2px solid #8f7032;
+    border-left: 2px solid #8f7032;
+    background:
+        linear-gradient(to bottom, #b7a575 0%, #f5ebcc 6px, #efe2bb 50%, #e7d5a5 100%);
+    box-shadow:
+        0 12px 24px rgba(0, 0, 0, 0.28);
+}
+
+.codescroll .code-foot {
+    background:
+        linear-gradient(to bottom, #e7d5a5 0%, #e7d5a5 50%, #b7a575 100%);
+    border-bottom-left-radius: 10px 50%;
+    border-bottom-right-radius: 10px 50%;
+    border: 2px solid #8f7032;
+    border-top: none;
+    margin: 0;
+    padding-top: 5px;
+    padding-bottom: 5px;
+    box-shadow:
+        0 12px 24px rgba(0, 0, 0, 0.28);
+    clip-path: inset(0px -35px -35px -35px);
 }
 
 .codescroll .scroll-tail {
@@ -56,6 +96,11 @@
     padding-bottom: 2px;
     user-select: none;
     cursor: pointer;
+    background: linear-gradient(to bottom, #b7a575 0%, #efe2bb 5px, #efe2bb 100%);
+    border: 2px solid #8f7032;
+    border-top: none;
+    box-shadow:
+        0 12px 24px rgba(0, 0, 0, 0.28);
 }
 
 .codescroll .codescroll-head-content {
@@ -159,59 +204,7 @@
 }
 
 .codescroll .trace-slider-container {
-      white-space: normal;
-}
-
-.codescroll .code-body{
-    border-right: 2px solid #8f7032;
-    border-left: 2px solid #8f7032;
-    background:
-        linear-gradient(to bottom, #b7a575 0%, #f5ebcc 6px, #efe2bb 50%, #e7d5a5 100%);
-    box-shadow:
-        0 12px 24px rgba(0, 0, 0, 0.28);
-}
-
-.codescroll>div {
-    font-family: 'Consolas', monospace;
-}
-
-.codescroll .code-head {
-    position: relative;
-    border-radius: 10px 10px 10px 10px / 50% 50% 50% 50%;
-    border: 2px solid #8f7032;
-    margin: 0;
-    padding-top: 5px;
-    padding-bottom: 5px;
-    width: calc(100% + 20px);
-    left: -10px;
-
-    background:
-        linear-gradient(to bottom, #b7a575 0%, #f5ebcc 50%, #e7d5a5 100%);
-    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.5);
-}
-
-.codescroll .code-foot {
-    background:
-        linear-gradient(to bottom, #e7d5a5 0%, #e7d5a5 50%, #b7a575 100%);
-    border-bottom-left-radius: 10px 50%;
-    border-bottom-right-radius: 10px 50%;
-    border: 2px solid #8f7032;
-    border-top: none;
-    margin: 0;
-    padding-top: 5px;
-    padding-bottom: 5px;
-
-    box-shadow:
-        0 12px 24px rgba(0, 0, 0, 0.28);
-    clip-path: inset(0px -35px -35px -35px);
-}
-
-.codescroll .scroll-tail {
-    background: linear-gradient(to bottom, #b7a575 0%, #efe2bb 5px, #efe2bb 100%);
-    border: 2px solid #8f7032;
-    border-top: none;
-    box-shadow:
-        0 12px 24px rgba(0, 0, 0, 0.28);
+    white-space: normal;
 }
 
 .trigger-viz {
