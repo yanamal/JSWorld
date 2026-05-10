@@ -610,7 +610,7 @@
             this.parsedFoot.innerHTML = "&nbsp;"; // reset any "replay" from previous parse
 
             if (!isFn(global.parseIntoHTML)) {
-                // TODO: skip isFn checks in general? if for some reason these functions don't exist, there is no point in trying to make anything work
+                // TODO: skip global isFn checks in general? if for some reason these functions don't exist, there is no point in trying to make anything work
                 this.model.parsed = {
                     ast: null,
                     html: `<pre class="codescroll-error">${escapeHtml("parseIntoHTML is not available.")}</pre>`,

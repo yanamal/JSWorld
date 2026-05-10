@@ -61,7 +61,7 @@ function emitParseEvent(scrollId, spellName, scrollRef) {
 // Take an original trace as returned by the visual interpreter, and make a more readable summary of important things in each step
 // TODO:this should really be general to codeScroll, but the logic is currently specific to the execution nuances in here.
 function getReadableTrace(origTrace, asts, codeSnippets) {
-    //asts and codeSnippest are both arrays of length N (usually 2) such that ast[i] has the ast that corresponds with code at codeSnippets[i].
+    // asts and codeSnippest are both arrays of length N (usually 2) such that ast[i] has the ast that corresponds with code at codeSnippets[i].
     // origTrace has the execution trace of executing **all** snippets together (usually funciton definition followed by funciton call)
     // so we don't know which snippet/ast each individual part of the trace came from.
 
@@ -153,11 +153,11 @@ function getReadableTrace(origTrace, asts, codeSnippets) {
 
         return {
             executedCode: markExecutedCode(snippet, matchedNode),
-            producedValue: step ? step.producedValue : undefined,
+            producedValue: step.producedValue ? step.producedValue : undefined,  // TODO: skip altogether if undefined
             nodeType: activeNode && activeNode.nodeType
                 ? activeNode.nodeType
                 : (matchedNode && (matchedNode.nodeType || matchedNode.type)) || null,
-            exception: step ? step.exception : undefined
+            exception: step.exception ? step.exception : undefined   // TODO: skip altogether if undefined
         };
     });
 }
@@ -203,11 +203,12 @@ function executeSpellCall({
     callText,
     spellName,
     invokedState,
-    onDone
+    onDone  // additional function to call after spell is done executing - e.g. "stop having the trigger visualization follow the mouse"
 }) {
     // get world state before spell call
     scrollRef.model.lastStateBeforeRun = getWorldState(player)
 
+    // reset "foot" part of "parsed" view - it may contain a "trace slider" for navigating the trace of the *previous* execution.
     const parsedFoot = document.getElementById(scrollId).querySelector('.codescroll-state-parsed .code-foot');
     parsedFoot.innerHTML = '&nbsp;';
 
@@ -218,6 +219,9 @@ function executeSpellCall({
         return detail;
     };
 
+    // parse the function *call* code - e.g. whoosh(100, 100)
+    // TODO: error catching is not that necessary, since it's constructed by the game, not the user.
+    //  We expect it to just work, and if it doesn't, arguably this catching logic isn't much better than just letting it fail.
     let parsedCall;
     try {
         parsedCall = parseIntoHTML(callText);
@@ -235,12 +239,16 @@ function executeSpellCall({
         return Promise.resolve(settled(detail));
     }
 
+    // put the parsed call code into the "trigger visualization" element.
     triggerVizElem.innerHTML = parsedCall.html;
+    // stick together a combined AST of both the function body and the function call; both will be executed together.
     const combinedAst = structuredClone(parsedFunction.ast);
     combinedAst.body.push(...parsedCall.ast.body);
 
     return animateParse(triggerVizElem.children[0], 100, 20)
         .then(() => {
+            // interpret code; animate (with speed = 200) if the spell scroll is in the "parsed" state - the user sees the code.
+            // TODO: assumes player is the spell caster. This is not always going to be true.
             let interpSpeed = 0;
             if (scrollRef.getState() === 'parsed') interpSpeed = 200;
             return interpretCode(
@@ -257,8 +265,8 @@ function executeSpellCall({
             const condensedSlider = createTraceSlider(condensedTrace, document.getElementById(scrollId));
             // console.log(condensedTrace)
 
-            // get readable trace, use it to call debuggy (TODO: if it's the put_out_fire spell and is incorrect?..)
-
+            // get readable trace: a more concise version that can be passed to debuggy,store it in the scroll.
+            // if we end up calling debuggy for this run, we will use this readable trace.
             const spellCodeText = scrollRef.getSnapshot().wholeCode;
             const readableTrace = getReadableTrace(
                 condensedTrace,
@@ -267,13 +275,8 @@ function executeSpellCall({
             );
             console.log(readableTrace);
             scrollRef.model.lastTrace = readableTrace;
-            //
-            // const fullCode = `${spellCodeText}\n${callText}`
-            // if(spellName === 'put_out_fire') {
-            //     console.log('fetching debuggy help...')
-            //     fetchDebuggyHelp(stateBefore, fullCode, readableTrace, {}, null)
-            // }
 
+            // reset the trigger visualization; append the trace slider to the 'foot' part of the 'parsed' code scroll state.
             parsedFoot.appendChild(condensedSlider);
             triggerVizElem.innerHTML = '';
 
