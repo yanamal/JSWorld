@@ -130,11 +130,11 @@
             const matchedNode = matched ? matched.node : null;
             return {
                 executedCode: markExecutedCode(snippet, matchedNode),
-                producedValue: step.producedValue ? step.producedValue : undefined,
                 nodeType: activeNode && activeNode.nodeType
                     ? activeNode.nodeType
                     : (matchedNode && (matchedNode.nodeType || matchedNode.type)) || null,
-                exception: step.exception ? step.exception : undefined
+                ...(step.producedValue != null && { producedValue: step.producedValue }),
+                ...(step.exception != null     && { exception: step.exception }),
             };
         });
     }
@@ -953,6 +953,7 @@
                         [this.getSnapshot().wholeCode, callText]
                     );
                     this.model.lastTrace = readableTrace;
+                    console.log(readableTrace)
 
                     this.parsedFoot.appendChild(condensedSlider);
 
