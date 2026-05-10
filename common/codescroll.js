@@ -473,7 +473,7 @@
             if (state === 'parsed') {
                 this.setTriggerAtHome();
             } else {
-                // collapsed or editing: hide but don't clear, so it's still there if user opens parsed view
+                // collapsed or editing: hide but don't clear — _parseCurrentCode clears it when re-parsing
                 this._stopTriggerMouseFollow();
                 this.triggerVizElem.style.display = 'none';
             }
@@ -495,7 +495,9 @@
             const whole = `${this.model.header}\n${body}\n${this.model.footer}`;
             this.model.lastWholeCode = whole;
 
-            this.parsedFoot.innerHTML = "&nbsp;"; // reset any "replay" from previous parse
+            this.parsedFoot.innerHTML = "&nbsp;"; // reset trace slider from previous run
+            this.triggerVizElem.innerHTML = '';   // reset triggerViz from previous run
+            this.triggerVizElem.style.display = 'none';
 
             if (!isFn(global.parseIntoHTML)) {
                 // TODO: skip global isFn checks in general? if for some reason these functions don't exist, there is no point in trying to make anything work
@@ -954,7 +956,7 @@
 
                     this.parsedFoot.appendChild(condensedSlider);
 
-                    // if in collapsed state, hide the triggerViz (keep content for if the user opens parsed view)
+                    // in collapsed state, hide triggerViz until the user opens parsed view
                     if (this.model.currentState === 'collapsed') {
                         this.triggerVizElem.style.display = 'none';
                     }
