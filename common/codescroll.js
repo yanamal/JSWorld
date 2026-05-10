@@ -819,6 +819,8 @@
 
         startTriggerFollowingMouse(getContentFn, initialX, initialY) {
             this._stopTriggerMouseFollow();
+            this.triggerVizElem.style.backgroundColor = 'aliceblue';
+            this.triggerVizElem.style.boxShadow = '-1px 1px 4px rgba(0,0,0,0.4)';
             const updateViz = (vx, vy) => {
                 this.triggerVizElem.style.position = 'fixed';
                 this.triggerVizElem.style.transform = '';  // restore CSS default (translate -50%, 50%)
@@ -859,15 +861,49 @@
                 anchorEl = this.parsedBody;
                 alignBottom = true;
             }
-            if (anchorEl) {
-                const rect = anchorEl.getBoundingClientRect();
-                this.triggerVizElem.style.position = 'fixed';
-                this.triggerVizElem.style.left = rect.left + 'px';
-                this.triggerVizElem.style.top = (alignBottom ? rect.bottom : rect.top) + 'px';
-                this.triggerVizElem.style.width = rect.width + 'px';
-                this.triggerVizElem.style.transform = 'none';
+            if (!anchorEl) {
+                this.triggerVizElem.style.display = 'block';
+                return;
             }
-            this.triggerVizElem.style.display = 'block';
+
+            const targetRect = anchorEl.getBoundingClientRect();
+            const targetLeft = targetRect.left;
+            const targetTop = alignBottom ? targetRect.bottom : targetRect.top;
+            const targetWidth = targetRect.width;
+            const isVisible = this.triggerVizElem.style.display === 'block';
+
+            if (isVisible && isFn(this.triggerVizElem.animate)) {
+                // Capture current rendered bounds (getBoundingClientRect accounts for CSS transforms)
+                const from = this.triggerVizElem.getBoundingClientRect();
+
+                // Commit target position as inline styles
+                this.triggerVizElem.style.transform = 'none';
+                this.triggerVizElem.style.left = targetLeft + 'px';
+                this.triggerVizElem.style.top = targetTop + 'px';
+                this.triggerVizElem.style.width = targetWidth + 'px';
+
+                // Animate position via transform translate from starting offset, width separately
+                const dx = from.left - targetLeft;
+                const dy = from.top - targetTop;
+                const anim = this.triggerVizElem.animate([
+                    { transform: `translate(${dx}px, ${dy}px)`, width: from.width + 'px', backgroundColor: 'aliceblue',   boxShadow: '-1px 1px 4px rgba(0,0,0,0.4)' },
+                    { transform: 'translate(0, 0)',              width: targetWidth + 'px', backgroundColor: 'transparent', boxShadow: 'none' }
+                ], { duration: 250, easing: 'ease-out', fill: 'forwards' });
+
+                anim.addEventListener('finish', () => {
+                    anim.cancel(); // release fill; inline styles already set the final position
+                    this.triggerVizElem.style.backgroundColor = '';
+                    this.triggerVizElem.style.boxShadow = '';
+                }, { once: true });
+            } else {
+                this.triggerVizElem.style.transform = 'none';
+                this.triggerVizElem.style.left = targetLeft + 'px';
+                this.triggerVizElem.style.top = targetTop + 'px';
+                this.triggerVizElem.style.width = targetWidth + 'px';
+                this.triggerVizElem.style.backgroundColor = '';
+                this.triggerVizElem.style.boxShadow = '';
+                this.triggerVizElem.style.display = 'block';
+            }
         }
 
         executeCall(callText, options) {
