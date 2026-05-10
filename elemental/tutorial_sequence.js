@@ -238,7 +238,7 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
 
             this.handleSpellParse = (event) => {
                 const detail = event.detail || {};
-                if (!this.isCurrentStep('put-out-fire') || detail.spellName !== 'put_out_fire') return;
+                if (!this.isCurrentStep('put-out-fire') || detail.scrollId !== 'put-out-fire-scroll') return;
 
                 if (detail.success && !this.stepState.firstParseSuccessSeen) {
                     this.stepState.firstParseSuccessSeen = true;
@@ -274,7 +274,7 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
 
             this.handleSpellCastError = (event) => {
                 const detail = event.detail || {};
-                if (!this.isCurrentStep('put-out-fire') || detail.spellName !== 'put_out_fire') return;
+                if (!this.isCurrentStep('put-out-fire') || detail.scrollId !== 'put-out-fire-scroll') return;
                 if (this.stepState.firstErrorSeen) return;
 
                 this.stepState.firstErrorSeen = true;
@@ -288,7 +288,7 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
 
             this.handleSpellCastComplete = (event) => {
                 const detail = event.detail || {};
-                if (!this.isCurrentStep('put-out-fire') || detail.spellName !== 'put_out_fire') return;
+                if (!this.isCurrentStep('put-out-fire') || detail.scrollId !== 'put-out-fire-scroll') return;
 
                 const trace = putOutFireScroll?.model?.lastTrace;
                 const lastStep = Array.isArray(trace) && trace.length > 0
@@ -330,10 +330,10 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
 
         start() {
             window.addEventListener('elemental:player-move-start', this.handlePlayerMoveStart);
-            window.addEventListener('elemental:spell-cast-settled', this.handleSpellCastSettled);
+            window.addEventListener('codescroll:cast-settled', this.handleSpellCastSettled);
             window.addEventListener('elemental:spell-parse', this.handleSpellParse);
-            window.addEventListener('elemental:spell-cast-error', this.handleSpellCastError);
-            window.addEventListener('elemental:spell-cast-complete', this.handleSpellCastComplete);
+            window.addEventListener('codescroll:cast-error', this.handleSpellCastError);
+            window.addEventListener('codescroll:cast-complete', this.handleSpellCastComplete);
             testButtonEl.addEventListener('click', this.handleTestButtonClick);
             this.enterStep(0);
         }

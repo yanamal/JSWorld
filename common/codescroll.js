@@ -57,6 +57,107 @@
         return out;
     }
 
+    function getReadableTrace(origTrace, asts, codeSnippets) {
+        const trace = Array.isArray(origTrace) ? origTrace : [];
+        const astList = Array.isArray(asts) ? asts : [];
+        const snippets = Array.isArray(codeSnippets) ? codeSnippets : [];
+
+        function walkNodes(value, onNode) {
+            if (!value) return;
+            if (Array.isArray(value)) {
+                for (const item of value) walkNodes(item, onNode);
+                return;
+            }
+            if (typeof value !== 'object') return;
+            onNode(value);
+            for (const child of Object.values(value)) {
+                walkNodes(child, onNode);
+            }
+        }
+
+        const uuidToNodeRef = new Map();
+        astList.forEach((ast, snippetIndex) => {
+            walkNodes(ast, (node) => {
+                if (!node || typeof node !== 'object') return;
+                if (node.uuid === undefined || node.uuid === null) return;
+                const key = String(node.uuid);
+                if (!uuidToNodeRef.has(key)) {
+                    uuidToNodeRef.set(key, { node, snippetIndex });
+                }
+            });
+        });
+
+        function getNodeBounds(node) {
+            if (!node || typeof node !== 'object') return null;
+            if (Number.isInteger(node.start) && Number.isInteger(node.end)) {
+                return { start: node.start, end: node.end };
+            }
+            if (Array.isArray(node.range) && node.range.length >= 2) {
+                const start = node.range[0];
+                const end = node.range[1];
+                if (Number.isInteger(start) && Number.isInteger(end)) {
+                    return { start, end };
+                }
+            }
+            if (node.loc && typeof node.loc === 'object') {
+                const start = node.loc.start && node.loc.start.offset;
+                const end = node.loc.end && node.loc.end.offset;
+                if (Number.isInteger(start) && Number.isInteger(end)) {
+                    return { start, end };
+                }
+            }
+            return null;
+        }
+
+        function markExecutedCode(code, node) {
+            const text = typeof code === 'string' ? code : '';
+            const bounds = getNodeBounds(node);
+            if (!bounds) return text;
+            const start = Math.max(0, Math.min(text.length, bounds.start));
+            const end = Math.max(start, Math.min(text.length, bounds.end));
+            if (start === end) return text;
+            return `${text.slice(0, start)}★${text.slice(start, end)}★${text.slice(end)}`;
+        }
+
+        return trace.map((step) => {
+            const activeNode = step && step.activeNode ? step.activeNode : null;
+            const stepUuid = activeNode && activeNode.uuid !== undefined && activeNode.uuid !== null
+                ? String(activeNode.uuid)
+                : null;
+            const matched = stepUuid ? uuidToNodeRef.get(stepUuid) : null;
+            const snippetIndex = matched ? matched.snippetIndex : 0;
+            const snippet = snippets[snippetIndex] || '';
+            const matchedNode = matched ? matched.node : null;
+            return {
+                executedCode: markExecutedCode(snippet, matchedNode),
+                producedValue: step.producedValue ? step.producedValue : undefined,
+                nodeType: activeNode && activeNode.nodeType
+                    ? activeNode.nodeType
+                    : (matchedNode && (matchedNode.nodeType || matchedNode.type)) || null,
+                exception: step.exception ? step.exception : undefined
+            };
+        });
+    }
+
+    function getFixedTraceStepFilter(
+        include_produced_value = true,
+        include_exception = true,
+        include_completed_node = true,
+        include_side_effects = true,
+        include_pushed_node = false,
+        exclude_types = ['ExpressionStatement', 'BlockStatement']
+    ) {
+        return function (stepResult) {
+            if (exclude_types.includes(stepResult.activeNode.nodeType)) return false;
+            if (include_exception && stepResult.exception) return true;
+            if (include_completed_node && stepResult.completedNode) return true;
+            if (include_produced_value && stepResult.producedValue) return true;
+            if (include_side_effects && stepResult.hasSideEffect) return true;
+            if (include_pushed_node && stepResult.pushedNode) return true;
+            return false;
+        };
+    }
+
     class CodeScroll {
         constructor(container, definition, options) {
             if (!container) {
@@ -167,6 +268,9 @@
             this.parsedBody                   = root.querySelector(".codescroll-state-parsed .code-body");
             this.parsedFoot                   = root.querySelector(".codescroll-state-parsed .code-foot");
             this.parsedReveal                 = root.querySelector(".codescroll-state-parsed .codescroll-reveal");
+
+            this.triggerVizElem               = root.querySelector(".trigger-viz");
+            this._triggerFollowHandler        = null;
 
             // Interactions
             this.collapsedHead.addEventListener("click", (event) => {
@@ -354,6 +458,7 @@
             if (to === "editing" && this.aceEditor) {
                 this.aceEditor.resize();
             }
+            this._syncTriggerVizForState(to);
             if (isFn(extraCallback)) {
                 extraCallback(this);
             }
@@ -361,6 +466,17 @@
 
             // get rid of any stray code tooltips (TODO: more targeted and in a more appropriate place?)
             document.querySelector('.code-tooltip')?.remove()
+        }
+
+        _syncTriggerVizForState(state) {
+            if (!this.triggerVizElem || !this.triggerVizElem.innerHTML.trim()) return;
+            if (state === 'parsed') {
+                this.setTriggerAtHome();
+            } else {
+                // collapsed or editing: hide but don't clear, so it's still there if user opens parsed view
+                this._stopTriggerMouseFollow();
+                this.triggerVizElem.style.display = 'none';
+            }
         }
 
         _runTransitionCallbacks(from, to) {
@@ -699,6 +815,125 @@
             this._cleanupOverlayStyles("editing");
             this._cleanupOverlayStyles("collapsed");
             this._finalizeTransition(from, to, options.onComplete);
+        }
+
+        startTriggerFollowingMouse(getContentFn, initialX, initialY) {
+            this._stopTriggerMouseFollow();
+            const updateViz = (vx, vy) => {
+                this.triggerVizElem.style.position = 'fixed';
+                this.triggerVizElem.style.transform = '';  // restore CSS default (translate -50%, 50%)
+                this.triggerVizElem.style.width = '';
+                this.triggerVizElem.style.left = vx + 'px';
+                this.triggerVizElem.style.top = vy + 'px';
+                if (isFn(getContentFn)) {
+                    this.triggerVizElem.textContent = getContentFn(vx, vy);
+                }
+            };
+            this._triggerFollowHandler = (event) => updateViz(event.clientX, event.clientY);
+            window.addEventListener('mousemove', this._triggerFollowHandler);
+            if (initialX !== undefined && initialY !== undefined) {
+                updateViz(initialX, initialY);
+            }
+            this.triggerVizElem.style.display = 'block';
+        }
+
+        _stopTriggerMouseFollow() {
+            if (this._triggerFollowHandler) {
+                window.removeEventListener('mousemove', this._triggerFollowHandler);
+                this._triggerFollowHandler = null;
+            }
+        }
+
+        setTriggerAtHome() {
+            this._stopTriggerMouseFollow();
+            const state = this.model.currentState;
+            if (state === 'editing') {
+                this.triggerVizElem.style.display = 'none';
+                return;
+            }
+            let anchorEl;
+            let alignBottom = false;
+            if (state === 'collapsed') {
+                anchorEl = this.collapsedHead;
+            } else if (state === 'parsed') {
+                anchorEl = this.parsedBody;
+                alignBottom = true;
+            }
+            if (anchorEl) {
+                const rect = anchorEl.getBoundingClientRect();
+                this.triggerVizElem.style.position = 'fixed';
+                this.triggerVizElem.style.left = rect.left + 'px';
+                this.triggerVizElem.style.top = (alignBottom ? rect.bottom : rect.top) + 'px';
+                this.triggerVizElem.style.width = rect.width + 'px';
+                this.triggerVizElem.style.transform = 'none';
+            }
+            this.triggerVizElem.style.display = 'block';
+        }
+
+        executeCall(callText, options) {
+            const { initFunc, onBeforeRun } = options || {};
+            if (isFn(onBeforeRun)) {
+                this.model.lastStateBeforeRun = onBeforeRun();
+            }
+
+            this.parsedFoot.innerHTML = '&nbsp;';
+            const invokedState = this.model.currentState;
+
+            const parsedCall = global.parseIntoHTML(callText);
+            this.triggerVizElem.innerHTML = parsedCall.html;
+            this.setTriggerAtHome();
+
+            const combinedAst = structuredClone(this.model.parsed.ast);
+            combinedAst.body.push(...parsedCall.ast.body);
+
+            const scrollId = this.container.id;
+            const settled = (detail) => {
+                window.dispatchEvent(new CustomEvent('codescroll:cast-settled', { detail }));
+                return detail;
+            };
+
+            return global.animateParse(this.triggerVizElem.children[0], 100, 20)
+                .then(() => {
+                    let interpSpeed = 0;
+                    if (invokedState === 'parsed') interpSpeed = 200;
+                    return global.interpretCode(
+                        this.container,
+                        combinedAst,
+                        interpSpeed,
+                        false,
+                        isFn(initFunc) ? initFunc() : undefined
+                    );
+                })
+                .then((result) => {
+                    const fullTrace = Array.isArray(result.executionTrace) ? result.executionTrace : [];
+                    const condensedTrace = fullTrace.filter(getFixedTraceStepFilter());
+                    const condensedSlider = global.createTraceSlider(condensedTrace, this.container);
+
+                    const readableTrace = getReadableTrace(
+                        condensedTrace,
+                        [this.model.parsed.ast, parsedCall.ast],
+                        [this.getSnapshot().wholeCode, callText]
+                    );
+                    this.model.lastTrace = readableTrace;
+
+                    this.parsedFoot.appendChild(condensedSlider);
+
+                    // if in collapsed state, hide the triggerViz (keep content for if the user opens parsed view)
+                    if (this.model.currentState === 'collapsed') {
+                        this.triggerVizElem.style.display = 'none';
+                    }
+
+                    const detail = { scrollId, ok: true, result, sliderElement: condensedSlider, invokedState };
+                    window.dispatchEvent(new CustomEvent('codescroll:cast-complete', { detail }));
+                    return settled(detail);
+                })
+                .catch((error) => {
+                    console.error(error);
+                    this.triggerVizElem.innerHTML = '';
+                    const detail = { scrollId, ok: false, error, invokedState };
+                    window.dispatchEvent(new CustomEvent('codescroll:cast-error', { detail }));
+                    return settled(detail);
+                });
         }
 
         execute(event) {
