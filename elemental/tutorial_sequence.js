@@ -1,11 +1,6 @@
 (function () {
     'use strict';
 
-    if (!window.splashScroll || !window.whooshScroll || !window.putOutFireScroll) {
-        console.error('[tutorial] spell scrolls are not available');
-        return;
-    }
-
     const mainSpeechEl = document.getElementById('wizardMainSpeech');
     const sideSpeechEl = document.getElementById('wizardSideSpeech');
     const testButtonEl = document.getElementById('testItButton');
