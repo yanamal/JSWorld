@@ -7,10 +7,6 @@ window.addEventListener('mousemove', (event) => {
     mousey = event.clientY;
 });
 
-function emitElementalEvent(name, detail) {
-    window.dispatchEvent(new CustomEvent(name, { detail }));
-}
-
 function getTriggerViz(scrollId) {
     return document.getElementById(scrollId).querySelector('.trigger-viz');
 }
@@ -46,16 +42,6 @@ function hideTargetingCue() {
     if (!targetingCue) return;
     targetingCue.hidden = true;
     document.body.classList.remove('targeting-spell-active');
-}
-
-function emitParseEvent(scrollId, spellName, scrollRef) {
-    const snapshot = scrollRef.getSnapshot();
-    emitElementalEvent('elemental:spell-parse', {
-        scrollId,
-        spellName,
-        success: snapshot.parseSuccess === true,
-        snapshot
-    });
 }
 
 // Take an original trace as returned by the visual interpreter, and make a more readable summary of important things in each step
@@ -214,30 +200,14 @@ function executeSpellCall({
 
     const triggerVizElem = getTriggerViz(scrollId);
     const settled = (detail) => {
-        emitElementalEvent('elemental:spell-cast-settled', detail);
+        window.dispatchEvent(new CustomEvent('elemental:spell-cast-settled', { detail }));
         if (onDone) onDone(detail);
         return detail;
     };
 
     // parse the function *call* code - e.g. whoosh(100, 100)
-    // TODO: error catching is not that necessary, since it's constructed by the game, not the user.
-    //  We expect it to just work, and if it doesn't, arguably this catching logic isn't much better than just letting it fail.
-    let parsedCall;
-    try {
-        parsedCall = parseIntoHTML(callText);
-    } catch (error) {
-        console.error(error);
-        triggerVizElem.innerHTML = '';
-        const detail = {
-            scrollId,
-            spellName,
-            ok: false,
-            error,
-            invokedState
-        };
-        emitElementalEvent('elemental:spell-cast-error', detail);
-        return Promise.resolve(settled(detail));
-    }
+    // this is game-constructed code, not user-written, so we expect it to always parse successfully.
+    const parsedCall = parseIntoHTML(callText);
 
     // put the parsed call code into the "trigger visualization" element.
     triggerVizElem.innerHTML = parsedCall.html;
@@ -288,7 +258,7 @@ function executeSpellCall({
                 sliderElement: condensedSlider,
                 invokedState
             };
-            emitElementalEvent('elemental:spell-cast-complete', detail);
+            window.dispatchEvent(new CustomEvent('elemental:spell-cast-complete', { detail }));
             return settled(detail);
         })
         .catch((error) => {
@@ -301,7 +271,7 @@ function executeSpellCall({
                 error,
                 invokedState
             };
-            emitElementalEvent('elemental:spell-cast-error', detail);
+            window.dispatchEvent(new CustomEvent('elemental:spell-cast-error', { detail }));
             return settled(detail);
         });
 }
@@ -315,7 +285,6 @@ function executeTargetedSpell({ scrollId, scrollRef, parsedFunction, spellName, 
     ensureMousePosition();
     showTargetingCue(spellName);
     const triggerVizElem = getTriggerViz(scrollId);
-    emitElementalEvent('elemental:spell-targeting-start', { spellName, scrollId });
 
     function followMouse() {
         triggerVizElem.style.left = mousex + 'px';
@@ -334,7 +303,6 @@ function executeTargetedSpell({ scrollId, scrollRef, parsedFunction, spellName, 
         window.removeEventListener('mousemove', followMouse);
         window.removeEventListener('click', finalizeTarget, true);
         hideTargetingCue();
-        emitElementalEvent('elemental:spell-targeting-end', { spellName, scrollId });
 
         const callText = getTargetedCallText(spellName, mousex, mousey);
         executeSpellCall({
@@ -351,7 +319,7 @@ function executeTargetedSpell({ scrollId, scrollRef, parsedFunction, spellName, 
         }).catch((error) => {
             console.error(error);
             targetedSpellInProgress = false;
-            triggerVizElem.innerHTML = '';
+            getTriggerViz(scrollId).innerHTML = '';
         });
     }
 
@@ -382,7 +350,13 @@ function createTargetedSpellScroll({ scrollId, spellName, body, editingEnabled }
             },
             onTransitionComplete: ({ to }) => {
                 if (to === 'parsed') {
-                    emitParseEvent(scrollId, spellName, spellScroll);
+                    const snapshot = spellScroll.getSnapshot();
+                    window.dispatchEvent(new CustomEvent('elemental:spell-parse', { detail: {
+                        scrollId,
+                        spellName,
+                        success: snapshot.parseSuccess === true,
+                        snapshot
+                    }}));
                 }
             }
         }
@@ -448,71 +422,23 @@ const putOutFireScroll = createTargetedSpellScroll({
     editingEnabled: true
 });
 
-const spellRegistry = {
-    splash: {
-        spellName: 'splash',
-        scrollId: 'splash-scroll',
-        scrollRef: splashScroll,
-        targeted: false
-    },
-    whoosh: {
-        spellName: 'whoosh',
-        scrollId: 'whoosh-scroll',
-        scrollRef: whooshScroll,
-        targeted: true
-    },
-    put_out_fire: {
-        spellName: 'put_out_fire',
-        scrollId: 'put-out-fire-scroll',
-        scrollRef: putOutFireScroll,
-        targeted: true
-    }
-};
-
-function setScrollVisible(spellName, visible) {
-    const record = spellRegistry[spellName];
-    if (!record) return;
-    const container = document.getElementById(record.scrollId);
-    if (!container) return;
-    container.classList.toggle('tutorial-scroll-hidden', !visible);
-}
-
 function executeSpellByName(spellName, onDone) {
-    const record = spellRegistry[spellName];
-    if (!record) return false;
-
-    const snapshot = record.scrollRef.getSnapshot();
-    if (snapshot.parseSuccess !== true) return false;
-
-    if (record.targeted) {
-        return executeTargetedSpell({
-            scrollId: record.scrollId,
-            scrollRef: record.scrollRef,
-            parsedFunction: record.scrollRef.getParsed(),
-            spellName: record.spellName,
-            onDone
-        });
+    const scrolls = {
+        splash:       { scrollRef: splashScroll,      targeted: false },
+        whoosh:       { scrollRef: whooshScroll,      targeted: true  },
+        put_out_fire: { scrollRef: putOutFireScroll,  targeted: true  }
+    };
+    const spell = scrolls[spellName];
+    if (!spell || spell.scrollRef.getSnapshot().parseSuccess !== true) return false;
+    if (!spell.targeted) {
+        executeSplashScroll(spell.scrollRef, spell.scrollRef.getParsed());
+        return true;
     }
-
-    executeSplashScroll(record.scrollRef, record.scrollRef.getParsed());
-    return true;
+    return executeTargetedSpell({
+        scrollId: spell.scrollRef.container.id,
+        scrollRef: spell.scrollRef,
+        parsedFunction: spell.scrollRef.getParsed(),
+        spellName,
+        onDone
+    });
 }
-
-window.elementalSpellUi = {
-    getScroll(spellName) {
-        return spellRegistry[spellName]?.scrollRef || null;
-    },
-    getScrollContainer(spellName) {
-        const record = spellRegistry[spellName];
-        if (!record) return null;
-        return document.getElementById(record.scrollId);
-    },
-    revealScroll(spellName) {
-        setScrollVisible(spellName, true);
-    },
-    hideScroll(spellName) {
-        setScrollVisible(spellName, false);
-    },
-    setScrollVisible,
-    executeSpellByName
-};

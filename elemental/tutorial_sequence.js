@@ -1,9 +1,8 @@
 (function () {
     'use strict';
 
-    const spellUi = window.elementalSpellUi;
-    if (!spellUi) {
-        console.error('[tutorial] elementalSpellUi is not available');
+    if (!window.splashScroll || !window.whooshScroll || !window.putOutFireScroll) {
+        console.error('[tutorial] spell scrolls are not available');
         return;
     }
 
@@ -35,7 +34,7 @@ That's great, but now there are lots of puddles. I'll give you another function:
         step3: `
 Wouldn't it be convenient if we could make up a new spell that would put out the fire and clean it up all at once?
 
-Well, of course we can! Through the ✨magic of programming✨, we can create new functions that do as many things as we like. Actually, I started writing this spell but then got distracted and it doesn't quite work right. 
+Well, of course we can! Through the ✨magic of programming✨, we can create new functions that do as many things as we like. Actually, I started writing this spell but then got distracted and it doesn't quite work right.
 
 **See if you can fix the \`put_out_fire\` spell!** Edit it and click \`✓\`. When you think it's ready, click "**Play with fire!**" and I'll create some fire to test it with.
 `
@@ -155,11 +154,11 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
                             window.clearFires();
                         }
                         this.spawnFirstStepFires();
-                        spellUi.revealScroll('splash');
+                        splashScroll.container.classList.remove('tutorial-scroll-hidden');
                         this.showMainSpeech(STEP_TEXT.step1);
                         this.highlightElement(
                             'step1-splash-head',
-                            this.getSpellControl('splash', '.codescroll-state-collapsed .code-head'),
+                            this.getSpellControl(splashScroll, '.codescroll-state-collapsed .code-head'),
                             ['click']
                         );
                     },
@@ -174,12 +173,12 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
                     onEnter: async () => {
                         this.hideSideSpeech();
                         this.hideTestButton();
-                        spellUi.revealScroll('whoosh');
+                        whooshScroll.container.classList.remove('tutorial-scroll-hidden');
                         this.stepState.waterPixelsAtStep2Start = this.countWaterPixels();
                         this.showMainSpeech(STEP_TEXT.step2);
                         this.highlightElement(
                             'step2-whoosh-head',
-                            this.getSpellControl('whoosh', '.codescroll-state-collapsed .code-head'),
+                            this.getSpellControl(whooshScroll, '.codescroll-state-collapsed .code-head'),
                             ['click']
                         );
                     },
@@ -202,7 +201,7 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
                             window.clearFires();
                         }
 
-                        spellUi.revealScroll('put_out_fire');
+                        putOutFireScroll.container.classList.remove('tutorial-scroll-hidden');
                         this.showMainSpeech(STEP_TEXT.step3);
                         this.showTestButton();
                         if (debuggyAssistant) {
@@ -213,22 +212,18 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
                             );
                         }
 
-                        const putOutScroll = spellUi.getScroll('put_out_fire');
-                        if (putOutScroll) {
-                            putOutScroll.setState('collapsed');
-                            await wait(260);
-                            await putOutScroll.transitionTo('editing');
-                        }
+                        putOutFireScroll.setState('collapsed');
+                        await wait(260);
+                        await putOutFireScroll.transitionTo('editing');
 
-                        // TODO: maybe use proper getScroll stuff
-                        splashScroll.setEditingEnabled(true)
-                        whooshScroll.setEditingEnabled(true)
+                        splashScroll.setEditingEnabled(true);
+                        whooshScroll.setEditingEnabled(true);
 
                         this.showSideSpeech(SIDE_TEXT.playWithFire);
 
                         this.highlightElement(
                             'step3-parse-btn',
-                            this.getSpellControl('put_out_fire', '.codescroll-state-editing .codescroll-parse-btn'),
+                            this.getSpellControl(putOutFireScroll, '.codescroll-state-editing .codescroll-parse-btn'),
                             ['click']
                         );
                     },
@@ -255,7 +250,7 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
                     this.showSideSpeech(SIDE_TEXT.parseSuccess);
                     this.highlightElement(
                         'step3-play-btn',
-                        this.getSpellControl('put_out_fire', '.codescroll-state-parsed .codescroll-play-btn'),
+                        this.getSpellControl(putOutFireScroll, '.codescroll-state-parsed .codescroll-play-btn'),
                         ['click']
                     );
                 }
@@ -265,19 +260,18 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
                     this.showSideSpeech(SIDE_TEXT.parseOrExecutionError);
                     this.highlightElement(
                         'step3-edit-btn',
-                        this.getSpellControl('put_out_fire', '.codescroll-state-parsed .codescroll-edit-btn'),
+                        this.getSpellControl(putOutFireScroll, '.codescroll-state-parsed .codescroll-edit-btn'),
                         ['click']
                     );
                 }
 
                 if (!detail.success) {
-                    const putOutScroll = spellUi.getScroll('put_out_fire');
-                    if (debuggyAssistant && putOutScroll) {
+                    if (debuggyAssistant) {
                         debuggyAssistant.beginAssistance({
-                            stateBefore: putOutScroll.model.lastStateBeforeRun || null,
-                            playerCode: putOutScroll.getSnapshot().wholeCode,
+                            stateBefore: putOutFireScroll.model.lastStateBeforeRun || null,
+                            playerCode: putOutFireScroll.getSnapshot().wholeCode,
                             executionTrace: null,
-                            parseErrorData: buildParseErrorData(putOutScroll, detail)
+                            parseErrorData: buildParseErrorData(putOutFireScroll, detail)
                         });
                     }
                 }
@@ -292,7 +286,7 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
                 this.showSideSpeech(SIDE_TEXT.parseOrExecutionError);
                 this.highlightElement(
                     'step3-edit-btn',
-                    this.getSpellControl('put_out_fire', '.codescroll-state-parsed .codescroll-edit-btn'),
+                    this.getSpellControl(putOutFireScroll, '.codescroll-state-parsed .codescroll-edit-btn'),
                     ['click']
                 );
             };
@@ -301,18 +295,17 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
                 const detail = event.detail || {};
                 if (!this.isCurrentStep('put-out-fire') || detail.spellName !== 'put_out_fire') return;
 
-                const putOutScroll = spellUi.getScroll('put_out_fire');
-                const trace = putOutScroll?.model?.lastTrace;
+                const trace = putOutFireScroll?.model?.lastTrace;
                 const lastStep = Array.isArray(trace) && trace.length > 0
                     ? trace[trace.length - 1]
                     : null;
                 const endedInException = !!(lastStep && lastStep.exception != null);
                 const outsideTestingContext = !this.stepState.testRunActive && !this.stepState.waitingForTestCast;
-                if (endedInException && outsideTestingContext && debuggyAssistant && putOutScroll) {
+                if (endedInException && outsideTestingContext && debuggyAssistant) {
                     debuggyAssistant.beginAssistance({
-                        stateBefore: putOutScroll.model.lastStateBeforeRun,
-                        playerCode: putOutScroll.getSnapshot().wholeCode,
-                        executionTrace: putOutScroll.model.lastTrace,
+                        stateBefore: putOutFireScroll.model.lastStateBeforeRun,
+                        playerCode: putOutFireScroll.getSnapshot().wholeCode,
+                        executionTrace: putOutFireScroll.model.lastTrace,
                         parseErrorData: null
                     });
                 }
@@ -414,15 +407,13 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
         }
 
         hideAllScrolls() {
-            spellUi.hideScroll('splash');
-            spellUi.hideScroll('whoosh');
-            spellUi.hideScroll('put_out_fire');
+            for (const scroll of [splashScroll, whooshScroll, putOutFireScroll]) {
+                scroll.container.classList.add('tutorial-scroll-hidden');
+            }
         }
 
-        getSpellControl(spellName, selector) {
-            const container = spellUi.getScrollContainer(spellName);
-            if (!container) return null;
-            return container.querySelector(selector);
+        getSpellControl(scroll, selector) {
+            return scroll.container.querySelector(selector);
         }
 
         highlightElement(key, element, eventTypes) {
@@ -552,14 +543,8 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
             this.stepState.testRunActive = true;
             testButtonEl.disabled = true;
 
-            const putOutScroll = spellUi.getScroll('put_out_fire');
-            if (!putOutScroll) {
-                this.finishTestRun();
-                return;
-            }
-
-            await putOutScroll.transitionTo('parsed');
-            const snapshot = putOutScroll.getSnapshot();
+            await putOutFireScroll.transitionTo('parsed');
+            const snapshot = putOutFireScroll.getSnapshot();
             if (snapshot.parseSuccess !== true) {
                 this.finishTestRun();
                 return;
@@ -574,7 +559,7 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
             this.spawnSingleTestFire();
 
             this.stepState.waitingForTestCast = true;
-            const targetingStarted = spellUi.executeSpellByName('put_out_fire', (detail) => {
+            const targetingStarted = executeSpellByName('put_out_fire', (detail) => {
                 this.handleTestCastResult(detail);
             });
 
@@ -606,16 +591,14 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
             }
 
             // Test was not successful - begin or continue debugging assistant flow.
-            const putOutScroll = spellUi.getScroll('put_out_fire');
-            if (debuggyAssistant && putOutScroll) {
+            if (debuggyAssistant) {
                 debuggyAssistant.beginAssistance({
-                    stateBefore: putOutScroll.model.lastStateBeforeRun,
-                    playerCode: putOutScroll.getSnapshot().wholeCode,
-                    executionTrace: putOutScroll.model.lastTrace,
+                    stateBefore: putOutFireScroll.model.lastStateBeforeRun,
+                    playerCode: putOutFireScroll.getSnapshot().wholeCode,
+                    executionTrace: putOutFireScroll.model.lastTrace,
                     parseErrorData: null
                 });
             }
-
 
             // clear fire and water from screen
             if (typeof window.clearWater === 'function') {
