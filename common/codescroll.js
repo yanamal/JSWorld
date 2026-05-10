@@ -1,8 +1,6 @@
 (function (global) {
     "use strict";
 
-    const RUNTIME_STYLE_ID = "codescroll-runtime-style";
-
     function isFn(value) {
         return typeof value === "function";
     }
@@ -41,187 +39,6 @@
         }
     }
 
-    function ensureRuntimeStyles() {
-        if (document.getElementById(RUNTIME_STYLE_ID)) {
-            return;
-        }
-        const style = document.createElement("style");
-        style.id = RUNTIME_STYLE_ID;
-        style.textContent = `
-.codescroll {
-    display: inline-block;
-    vertical-align: top;
-}
-
-.codescroll .codescroll-state {
-    position: relative;
-    overflow: visible;
-}
-
-.codescroll .codescroll-state[hidden] {
-    display: none !important;
-}
-
-.codescroll .codescroll-state-editing {
-    z-index: 100;
-}
-
-.codescroll .codescroll-state-parsed {
-    z-index: 100;
-}
-
-.codescroll .code-head {
-    overflow: hidden;
-    white-space: pre;
-}
-
-.codescroll .code-head.codescroll-execute-disabled {
-    cursor: not-allowed;
-}
-
-.codescroll .codescroll-reveal {
-    position: relative;
-    overflow: visible;
-}
-
-.codescroll .code-body,
-.codescroll .code-foot {
-    padding-left: 10px;
-    padding-right: 10px;
-}
-
-.codescroll .code-body {
-    min-height: 30px;
-    padding-top: 8px;
-    padding-bottom: 8px;
-}
-
-.codescroll .scroll-tail {
-    margin-left: auto;
-    margin-right: auto;
-    text-align: center;
-    border-bottom-left-radius: 6px;
-    border-bottom-right-radius: 6px;
-    padding-top: 3px;
-    padding-bottom: 2px;
-    user-select: none;
-    cursor: pointer;
-}
-
-.codescroll .codescroll-head-content {
-    display: block;
-    width: calc(100% - 12px);
-    margin-left: 6px;
-    margin-right: 6px;
-    overflow: hidden;
-}
-
-.codescroll .codescroll-head-text {
-    display: inline-block;
-    white-space: pre;
-    will-change: transform, opacity;
-}
-
-.codescroll .codescroll-blank {
-    white-space: pre;
-}
-
-.codescroll .codescroll-control-btn {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    border: none;
-    background: transparent;
-    font-size: 14px;
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
-}
-
-.codescroll .codescroll-play-btn {
-  left: 40%;
-  right: 40%;
-  color: #1d7a2f;
-  border: 1px solid gray;
-  padding: 2px;
-  box-shadow: 2px 2px 2px gray;
-}
-
-.codescroll .codescroll-play-btn:disabled {
-    color: #666;
-    box-shadow: none;
-    cursor: not-allowed;
-    opacity: 0.7;
-}
-
-.codescroll .codescroll-parse-btn {
-    color: #1d7a2f;
-}
-
-.codescroll .codescroll-edit-btn {
-    color: #1f4f8a;
-    right: 30px;
-}
-
-.codescroll .codescroll-close-btn {
-    color: #7d1e1e;
-}
-
-.codescroll .codescroll-editor-host {
-    width: 100%;
-    min-height: 66px;
-}
-
-.codescroll .codescroll-fallback-editor {
-    width: calc(100% - 2px);
-    min-height: 66px;
-    box-sizing: border-box;
-    border: 1px solid #8f7032;
-    background: rgba(255, 255, 255, 0.32);
-    font-family: Consolas, monospace;
-    font-size: 14px;
-    resize: vertical;
-}
-
-.codescroll .codescroll-error {
-    color: #7f1d1d;
-    margin: 0;
-}
-
-.codescroll .codescroll-parse-error-indicator {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #b91c1c;
-    font-size: 14px;
-    font-weight: 700;
-    pointer-events: none;
-    user-select: none;
-}
-
-.codescroll .codescroll-parse-error-indicator-collapsed {
-    right: 8px;
-}
-
-.codescroll .codescroll-parse-error-indicator-parsed {
-    left: 8px;
-}
-`;
-        document.head.appendChild(style);
-    }
-
-    function createDiv(className, text) {
-        const div = document.createElement("div");
-        if (className) {
-            div.className = className;
-        }
-        if (typeof text !== "undefined") {
-            div.textContent = text;
-        }
-        return div;
-    }
-
     function normalizeDefinition(definition) {
         if (!definition || typeof definition !== "object") {
             throw new Error("CodeScroll definition must be an object.");
@@ -245,7 +62,6 @@
             if (!container) {
                 throw new Error("CodeScroll requires a parent element.");
             }
-            ensureRuntimeStyles();
             this.container = container;
             this.definition = normalizeDefinition(definition);
             this.options = options || {};
@@ -274,130 +90,86 @@
         }
 
         _buildDom() {
-            // TODO: use html?
             const root = this.container;
             root.classList.add("codescroll");
-            root.innerHTML = "";
             if (!root.style.position) {
                 root.style.position = "relative";
             }
 
+            // TODO: prepend special "executing-call" element (for parsing/executing state of actual trigger with params)
+            root.innerHTML = `
+                <div class="codescroll-state codescroll-state-collapsed">
+                    <div class="code-head">
+                        <div class="codescroll-head-content">
+                            <div class="codescroll-head-text">${escapeHtml(this.model.trigger)}</div>
+                        </div>
+                        <div class="codescroll-parse-error-indicator codescroll-parse-error-indicator-collapsed" title="Code has parse errors" hidden>✖</div>
+                    </div>
+                    <div class="codescroll-reveal">
+                        <div class="scroll-tail">▼</div>
+                    </div>
+                </div>
+                <div class="codescroll-state codescroll-state-editing">
+                    <div class="code-head" style="position: relative">
+                        <div class="codescroll-head-content">
+                            <div class="codescroll-head-text">${escapeHtml(this.model.header)}</div>
+                        </div>
+                        <button class="codescroll-control-btn codescroll-close-btn" type="button" title="Close and parse">✕</button>
+                    </div>
+                    <div class="codescroll-reveal">
+                        <div class="code-body">
+                            <div class="codescroll-editor-host"></div>
+                        </div>
+                        <div class="code-foot" style="position: relative">
+                            <div>${escapeHtml(this.model.footer)}</div>
+                            <button class="codescroll-control-btn codescroll-parse-btn" type="button" title="Parse code">✓</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="codescroll-state codescroll-state-parsed">
+                    <div class="code-head" style="position: relative">
+                        <div class="codescroll-head-content codescroll-blank">&nbsp;</div>
+                        <button class="codescroll-control-btn codescroll-close-btn" type="button" title="Collapse scroll">✕</button>
+                        <button class="codescroll-control-btn codescroll-play-btn" type="button" title="Execute Code">▶</button>
+                        <div class="codescroll-parse-error-indicator codescroll-parse-error-indicator-parsed" title="Code has parse errors" hidden>✖</div>
+                        <button class="codescroll-control-btn codescroll-edit-btn" type="button" title="Back to editing">↩</button>
+                    </div>
+                    <div class="codescroll-reveal">
+                        <div class="code-body"></div>
+                        <div class="code-foot">&nbsp;</div>
+                    </div>
+                </div>
+                <div class="trigger-viz"></div>
+            `;
+
             this.stateElems = {
-                collapsed: createDiv("codescroll-state codescroll-state-collapsed"),
-                editing: createDiv("codescroll-state codescroll-state-editing"),
-                parsed: createDiv("codescroll-state codescroll-state-parsed")
+                collapsed: root.querySelector(".codescroll-state-collapsed"),
+                editing:   root.querySelector(".codescroll-state-editing"),
+                parsed:    root.querySelector(".codescroll-state-parsed")
             };
 
-            // collapsed
-            const cHead = createDiv("code-head");
-            this.collapsedHead = cHead;
-            const cHeadContent = createDiv("codescroll-head-content");
-            this.collapsedTriggerText = createDiv("codescroll-head-text", this.model.trigger);
-            cHeadContent.appendChild(this.collapsedTriggerText);
-            cHead.appendChild(cHeadContent);
-            this.collapsedParseErrorIndicator = createDiv(
-                "codescroll-parse-error-indicator codescroll-parse-error-indicator-collapsed",
-                "✖"
-            );
-            this.collapsedParseErrorIndicator.title = "Code has parse errors";
-            this.collapsedParseErrorIndicator.hidden = true;
-            cHead.appendChild(this.collapsedParseErrorIndicator);
-            this.collapsedTail = createDiv("scroll-tail");
-            this.collapsedTail.textContent = "▼";
-            this.stateElems.collapsed.appendChild(cHead);
-            this.collapsedTailReveal = createDiv("codescroll-reveal");
-            this.collapsedTailReveal.appendChild(this.collapsedTail);
-            this.stateElems.collapsed.appendChild(this.collapsedTailReveal);
+            this.collapsedHead                = root.querySelector(".codescroll-state-collapsed .code-head");
+            this.collapsedTriggerText         = root.querySelector(".codescroll-state-collapsed .codescroll-head-text");
+            this.collapsedParseErrorIndicator = root.querySelector(".codescroll-parse-error-indicator-collapsed");
+            this.collapsedTail                = root.querySelector(".scroll-tail");
+            this.collapsedTailReveal          = root.querySelector(".codescroll-state-collapsed .codescroll-reveal");
 
-            // editing
-            this.editingHead = createDiv("code-head");
-            this.editingHead.style.position = "relative";
-            const eHeadContent = createDiv("codescroll-head-content");
-            this.editingHeadText = createDiv("codescroll-head-text", this.model.header);
-            eHeadContent.appendChild(this.editingHeadText);
-            this.editingHead.appendChild(eHeadContent);
-            this.editingCloseButton = document.createElement("button");
-            this.editingCloseButton.className = "codescroll-control-btn codescroll-close-btn";
-            this.editingCloseButton.type = "button";
-            this.editingCloseButton.title = "Close and parse";
-            this.editingCloseButton.textContent = "✕";
-            this.editingHead.appendChild(this.editingCloseButton);
+            this.editingHeadText              = root.querySelector(".codescroll-state-editing .codescroll-head-text");
+            this.editingBody                  = root.querySelector(".codescroll-state-editing .code-body");
+            this.editingFoot                  = root.querySelector(".codescroll-state-editing .code-foot");
+            this.editingReveal                = root.querySelector(".codescroll-state-editing .codescroll-reveal");
+            this.editorHost                   = root.querySelector(".codescroll-editor-host");
 
-            this.editingBody = createDiv("code-body");
-            this.editorHost = createDiv("codescroll-editor-host");
-            this.editingBody.appendChild(this.editorHost);
-
-            this.editingFoot = createDiv("code-foot");
-            this.editingFooterText = createDiv("", this.model.footer);
-            this.editingFoot.style.position = "relative";
-            this.parseButton = document.createElement("button");
-            this.parseButton.className = "codescroll-control-btn codescroll-parse-btn";
-            this.parseButton.type = "button";
-            this.parseButton.title = "Parse code";
-            this.parseButton.textContent = "✓";
-            this.editingFoot.appendChild(this.editingFooterText);
-            this.editingFoot.appendChild(this.parseButton);
-
-            this.stateElems.editing.appendChild(this.editingHead);
-            this.editingReveal = createDiv("codescroll-reveal");
-            this.editingReveal.appendChild(this.editingBody);
-            this.editingReveal.appendChild(this.editingFoot);
-            this.stateElems.editing.appendChild(this.editingReveal);
-
-            // parsed
-            this.parsedHead = createDiv("code-head");
-            this.parsedHead.style.position = "relative";
-            this.parsedHeadBlank = createDiv("codescroll-head-content codescroll-blank", "\u00A0");
-
-            this.closeButton = document.createElement("button");
-            this.closeButton.className = "codescroll-control-btn codescroll-close-btn";
-            this.closeButton.type = "button";
-            this.closeButton.title = "Collapse scroll";
-            this.closeButton.textContent = "✕";
-            this.parsedHead.appendChild(this.parsedHeadBlank);
-            this.parsedHead.appendChild(this.closeButton);
-
-
-            this.executeButton = document.createElement("button");
-            this.executeButton.className = "codescroll-control-btn codescroll-play-btn"
-            this.executeButton.type = "button";
-            this.executeButton.title = "Execute Code";
-            this.executeButton.textContent = "▶";
-            this.parsedHead.appendChild(this.executeButton);
-            this.parsedParseErrorIndicator = createDiv(
-                "codescroll-parse-error-indicator codescroll-parse-error-indicator-parsed",
-                "✖"
-            );
-            this.parsedParseErrorIndicator.title = "Code has parse errors";
-            this.parsedParseErrorIndicator.hidden = true;
-            this.parsedHead.appendChild(this.parsedParseErrorIndicator);
-
-            this.editButton = document.createElement("button");
-            this.editButton.className = "codescroll-control-btn codescroll-edit-btn";
-            this.editButton.type = "button";
-            this.editButton.title = "Back to editing";
-            this.editButton.textContent = "↩";
-            this.parsedHead.appendChild(this.editButton);
-
-
-            this.parsedBody = createDiv("code-body");
-            this.parsedFoot = createDiv("code-foot");
-            this.parsedFoot.innerHTML = "&nbsp;";
-            this.stateElems.parsed.appendChild(this.parsedHead);
-            this.parsedReveal = createDiv("codescroll-reveal");
-            this.parsedReveal.appendChild(this.parsedBody);
-            this.parsedReveal.appendChild(this.parsedFoot);
-            this.stateElems.parsed.appendChild(this.parsedReveal);
-
-            // TODO:prepend special "executing-call" element (for parsing/executing state of actual trigger with params)
-            const tv = createDiv('trigger-viz');
-            root.appendChild(this.stateElems.collapsed);
-            root.appendChild(this.stateElems.editing);
-            root.appendChild(this.stateElems.parsed);
-            root.appendChild(tv);
+            this.closeButton                  = root.querySelector(".codescroll-state-parsed .codescroll-close-btn");
+            this.executeButton                = root.querySelector(".codescroll-play-btn");
+            this.parsedParseErrorIndicator    = root.querySelector(".codescroll-parse-error-indicator-parsed");
+            this.editButton                   = root.querySelector(".codescroll-edit-btn");
+            this.parsedBody                   = root.querySelector(".codescroll-state-parsed .code-body");
+            this.parsedFoot                   = root.querySelector(".codescroll-state-parsed .code-foot");
+            this.parsedReveal                 = root.querySelector(".codescroll-state-parsed .codescroll-reveal");
 
             // Interactions
-            cHead.addEventListener("click", (event) => {
+            this.collapsedHead.addEventListener("click", (event) => {
                 if (!this._canExecute()) {
                     event.preventDefault();
                     return;
@@ -412,11 +184,11 @@
                 }
                 this.transitionTo("editing");
             });
-            this.parseButton.addEventListener("click", (event) => {
+            root.querySelector(".codescroll-parse-btn").addEventListener("click", (event) => {
                 event.stopPropagation();
                 this.transitionTo("parsed");
             });
-            this.editingCloseButton.addEventListener("click", (event) => {
+            root.querySelector(".codescroll-state-editing .codescroll-close-btn").addEventListener("click", (event) => {
                 event.stopPropagation();
                 this._closeFromEditing();
             });
@@ -432,14 +204,14 @@
                 }
                 this.transitionTo("editing");
             });
-            this.executeButton.addEventListener("click", (event) =>{
+            this.executeButton.addEventListener("click", (event) => {
                 event.stopPropagation();
                 if (!this._canExecute()) {
                     event.preventDefault();
                     return;
                 }
                 this.execute(event);
-            })
+            });
         }
 
         _closeFromEditing() {

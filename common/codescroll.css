@@ -1,4 +1,163 @@
 
+.codescroll {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.codescroll .codescroll-state {
+    position: relative;
+    overflow: visible;
+}
+
+.codescroll .codescroll-state[hidden] {
+    display: none !important;
+}
+
+.codescroll .codescroll-state-editing {
+    z-index: 100;
+}
+
+.codescroll .codescroll-state-parsed {
+    z-index: 100;
+}
+
+.codescroll .code-head {
+    overflow: hidden;
+}
+
+.codescroll .code-head.codescroll-execute-disabled {
+    cursor: not-allowed;
+}
+
+.codescroll .codescroll-reveal {
+    position: relative;
+    overflow: visible;
+}
+
+.codescroll .code-body,
+.codescroll .code-foot {
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.codescroll .code-body {
+    min-height: 30px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+.codescroll .scroll-tail {
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+    border-bottom-left-radius: 6px;
+    border-bottom-right-radius: 6px;
+    padding-top: 3px;
+    padding-bottom: 2px;
+    user-select: none;
+    cursor: pointer;
+}
+
+.codescroll .codescroll-head-content {
+    display: block;
+    width: calc(100% - 12px);
+    margin-left: 6px;
+    margin-right: 6px;
+    overflow: hidden;
+}
+
+.codescroll .codescroll-head-text {
+    display: inline-block;
+    white-space: pre;
+    will-change: transform, opacity;
+}
+
+.codescroll .codescroll-blank {
+    white-space: pre;
+}
+
+.codescroll .codescroll-control-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.codescroll .codescroll-play-btn {
+    left: 40%;
+    right: 40%;
+    color: #1d7a2f;
+    border: 1px solid gray;
+    padding: 2px;
+    box-shadow: 2px 2px 2px gray;
+}
+
+.codescroll .codescroll-play-btn:disabled {
+    color: #666;
+    box-shadow: none;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.codescroll .codescroll-parse-btn {
+    color: #1d7a2f;
+}
+
+.codescroll .codescroll-edit-btn {
+    color: #1f4f8a;
+    right: 30px;
+}
+
+.codescroll .codescroll-close-btn {
+    color: #7d1e1e;
+}
+
+.codescroll .codescroll-editor-host {
+    width: 100%;
+    min-height: 66px;
+}
+
+.codescroll .codescroll-fallback-editor {
+    width: calc(100% - 2px);
+    min-height: 66px;
+    box-sizing: border-box;
+    border: 1px solid #8f7032;
+    background: rgba(255, 255, 255, 0.32);
+    font-family: Consolas, monospace;
+    font-size: 14px;
+    resize: vertical;
+}
+
+.codescroll .codescroll-error {
+    color: #7f1d1d;
+    margin: 0;
+}
+
+.codescroll .codescroll-parse-error-indicator {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #b91c1c;
+    font-size: 14px;
+    font-weight: 700;
+    pointer-events: none;
+    user-select: none;
+}
+
+.codescroll .codescroll-parse-error-indicator-collapsed {
+    right: 8px;
+}
+
+.codescroll .codescroll-parse-error-indicator-parsed {
+    left: 8px;
+}
+
 .codescroll .trace-slider-container {
       white-space: normal;
 }
@@ -14,7 +173,6 @@
 
 .codescroll>div {
     font-family: 'Consolas', monospace;
-    white-space: pre;
 }
 
 .codescroll .code-head {
