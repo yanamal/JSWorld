@@ -38,7 +38,18 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
 Zerro wants a spell named after him! The \`zerro()\` function should draw water in the shape of the letter **Z**.
 
 **Edit the spell body to trace a Z with \`water(x, y, radius)\` calls, then click "Let Zerro try it!"**
-`
+`,
+        ending: `
+# To Be Continued...
+
+Thanks for playing through the demo! It is still very short, but hopefully it gets across how these ways of teaching programming could be helpful.
+            
+In the near future, I hope to add at least one more spell to this Elemental Magic world, and experiment with new worlds that utilize the "code spell" concept in different ways
+            
+Maybe a barkeep needs a spell that magically fills all the tankards that are placed on the bar by iterating though them. Maybe a steampunk engineer needs a spell to control his lunar lander. A shady character could be selling "discount spells, only slightly buggy".
+            
+I think one of the strengths of this particular approach is that it allows for creating bespoke vignettes that fit the particular concept or skill you are trying to teach at the moment. (While still maintaining the unifying "programs as spells" metaphor).
+        `
     };
 
     const SIDE_TEXT = {
@@ -811,7 +822,10 @@ Zerro wants a spell named after him! The \`zerro()\` function should draw water 
 
                 this.showZerroSpeech(`Yay! Thank you!`);
                 await this.completeCurrentStep();
-                this.hideZerroSpeech()
+                zerroScroll.transitionTo("collapsed");
+                await wait(1100);
+                this.hideZerroSpeech();
+                (async () => { while (true) { await zerro_casting_z(); } })();
                 return;
             }
 
@@ -832,10 +846,21 @@ Zerro wants a spell named after him! The \`zerro()\` function should draw water 
             finaleEl.hidden = false;
             requestAnimationFrame(() => {
                 finaleEl.classList.add('visible');
+                //this.showMainSpeech(STEP_TEXT.ending) // TODO: make sure to update the text if I use this version.
             });
         }
     }
 
     const tutorial = new TutorialSequence();
     tutorial.start();
+
+    async function zerro_casting_z(){
+        const randomX = Math.floor(Math.random() * (window.innerWidth-300))+150;
+        const randomY = Math.floor(Math.random() * (window.innerHeight-300))+150;
+        await zerro.moveTo(randomX, randomY)
+        await zerroScroll.executeCall('zerro()', {
+                initFunc: () => createMagicInitFunc(zerro),
+                onBeforeRun: () => getWorldState(zerro)
+            });
+    }
 })();

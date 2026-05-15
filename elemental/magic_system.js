@@ -111,6 +111,14 @@ class Entity {
         this.rotation = Math.atan2(dx, -dy);
         this.isMoving = true;
         this.updateElement();
+
+        // Resolve any in-progress movement promise (target changed mid-move)
+        if (this._moveResolve) {
+            this._moveResolve();
+            this._moveResolve = null;
+        }
+        const promise = new Promise(resolve => { this._moveResolve = resolve; });
+
         window.dispatchEvent(new CustomEvent('elemental:player-move-start', {
             detail: {
                 fromX,
@@ -119,6 +127,7 @@ class Entity {
                 toY: targetY
             }
         }));
+        return promise;
     }
 
     update(deltaTime) {
@@ -133,6 +142,10 @@ class Entity {
             this.x = this.targetX;
             this.y = this.targetY;
             this.isMoving = false;
+            if (this._moveResolve) {
+                this._moveResolve();
+                this._moveResolve = null;
+            }
         } else {
             this.x += (dx / dist) * moveAmount;
             this.y += (dy / dist) * moveAmount;
@@ -420,7 +433,7 @@ const zerro = new Entity(
 // Click to move
 playArea.addEventListener('click', (e) => {
     if (e.target === playArea || e.target === waterCanvas) {
-        player.moveTo(e.clientX, e.clientY);
+        void player.moveTo(e.clientX, e.clientY);
     }
 });
 
