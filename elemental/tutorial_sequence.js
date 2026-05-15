@@ -6,6 +6,7 @@
     const testButtonEl = document.getElementById('testItButton');
     const finaleEl = document.getElementById('tutorialFinale');
     const finaleBodyEl = document.getElementById('tutorialFinaleBody');
+    const waterCanvas = document.getElementById('waterCanvas');
     const debuggyAssistant = typeof window.createDebuggyAssistant === 'function'
         ? window.createDebuggyAssistant()
         : null;
@@ -32,6 +33,11 @@ Wouldn't it be convenient if we could make up a new spell that would put out the
 Well, of course we can! Through the ✨magic of programming✨, we can create new functions that do as many things as we like. Actually, I started writing this spell but then got distracted and it doesn't quite work right.
 
 **See if you can fix the \`put_out_fire\` spell!** Edit it and click \`✓\`. When you think it's ready, click "**Play with fire!**" and I'll create some fire to test it with.
+`,
+        step4: `
+Zerro wants a spell named after him! The \`zerro()\` function should draw water in the shape of the letter **Z**.
+
+**Edit the spell body to trace a Z with \`water(x, y, radius)\` calls, then click "Let Zerro try it!"**
 `
     };
 
@@ -122,8 +128,15 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
                 firstErrorSeen: false,
                 firstReplaySeen: false,
                 testRunActive: false,
-                waitingForTestCast: false
+                waitingForTestCast: false,
+                zerroTestActive: false,
+                zerroWorkerPromise: null
             };
+
+            this.zerroSpeechEl = document.createElement('div');
+            this.zerroSpeechEl.id = 'zerroSpeech';
+            this.zerroSpeechEl.hidden = true;
+            document.body.appendChild(this.zerroSpeechEl);
 
             this.steps = [
                 {
@@ -235,7 +248,9 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
                         window.clearWater();
                         window.clearFires();
                         this.hideSideSpeech();
+                        this.hideZerroSpeech();
                         this.hideMainSpeech();
+                        // this.showMainSpeech(STEP_TEXT.step4);
 
                         // collapse previous spell
                         putOutFireScroll.transitionTo('collapsed').then(()=>{
@@ -245,19 +260,27 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
                                 'step4-zerro-scroll',
                                 this.getSpellControl(zerroScroll, '.codescroll-state-editing'),
                                 ['click']
-                            )
-                        })
-
+                            );
+                        });
 
                         // move Zerro character into view
-                        zerro.moveTo(zerro.x, zerro.y-200); // Note/TODO: this coordinate system is confusing. these are global x and y as usually defined.
+                        zerro.moveTo(zerro.x, zerro.y-200);
 
+                        // Show test button with zerro-specific label
+                        testButtonEl.textContent = 'Let Zerro try it';
+                        this.showTestButton();
 
-                        // TODO: speech bubble to the right of zerro entity (coming from Zerro): "Hey, are you guys making new spells? Can you make one for me?"
+                        // Start Tesseract worker in background so it's ready when the student tests
+                        this.stepState.zerroWorkerPromise = this.createZerroWorker();
 
-                        // TODO: "Let Zerro try it" button - similar to "test it" in previous step: clear water, clear fire; cast zerro() spell; test for completeness
-                        //   completeness check: take the magic system's water canvas, clip it (to remove blank whitespace from the sides; pass image to tesseract.js to parse/OCR one single letter.
-                        //   if the letter returned is "Z" (capital or lowercase), then pass. Otherwise, Zerro's dialog says "Hmm, looks more like a '[letter]' to me."
+                        // Wait for Zerro to arrive, then show speech bubble
+                        await wait(1100);
+                        this.showZerroSpeech("Hey, are you guys making new spells? Can you make one for me?\n\n " +
+                            "My name is Zerro, so I want a spell that draws a Z inside a big water circle!\n\n " +
+                            "I've got the water circle part down, but can you add `wind` calls to draw the Z?");
+                    },
+                    onEvent: () => {
+                        // Step completion is handled by the explicit "Let Zerro try it" flow.
                     }
                 }
             ];
@@ -358,7 +381,13 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
             };
 
             this.handleTestButtonClick = () => {
-                this.runStep3TestSequence();
+                // TODO: factor out common actions? (e.g. clear water/fire, make sure relevant scroll is parsed, etc.)
+                //  More generally, make more of a generic "run specified tests" flow
+                if (this.isCurrentStep('zerro')) {
+                    this.runZerroTestSequence();
+                } else {
+                    this.runStep3TestSequence();
+                }
             };
         }
 
@@ -391,9 +420,14 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
             this.clearAllHighlights();
 
             const currentStep = this.steps[this.currentStepIndex];
-            if (currentStep && currentStep.id === 'put-out-fire') {
+            // TODO: could probably just hide all these things regardless of step? (would be no-op if already hidden?)
+            if (currentStep && (currentStep.id === 'put-out-fire' || currentStep.id === 'zerro')) {
                 this.hideTestButton();
                 this.hideSideSpeech();
+                testButtonEl.textContent = 'Play with fire!';
+            }
+            if (currentStep && currentStep.id === 'zerro') {
+                this.hideZerroSpeech();
             }
 
             const nextIndex = this.currentStepIndex + 1;
@@ -441,7 +475,8 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
         }
 
         hideAllScrolls() {
-            for (const scroll of [splashScroll, whooshScroll, putOutFireScroll]) {
+            // TODO: or just query the DOM for scrolls? Or don't do this, because they are set up to be hidden at the beginning?
+            for (const scroll of [splashScroll, whooshScroll, putOutFireScroll, zerroScroll]) {
                 scroll.container.classList.add('tutorial-scroll-hidden');
             }
         }
@@ -650,6 +685,143 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
 
         finishTestRun() {
             this.stepState.testRunActive = false;
+            testButtonEl.disabled = false;
+        }
+
+        showZerroSpeech(text) {
+            // TODO: innerHTML, and parse it with marked.
+            this.zerroSpeechEl.innerHTML = window.marked.parse(text);
+            const rect = zerro.element.getBoundingClientRect();
+            this.zerroSpeechEl.style.left = (rect.right + 14) + 'px';
+            this.zerroSpeechEl.style.top = (rect.top + rect.height / 2) + 'px';
+            this.zerroSpeechEl.style.transform = 'translateY(-50%)';
+            this.zerroSpeechEl.hidden = false;
+        }
+
+        hideZerroSpeech() {
+            this.zerroSpeechEl.hidden = true;
+        }
+
+        async createZerroWorker() {
+            if (typeof Tesseract === 'undefined') {
+                console.warn('Tesseract.js not loaded');
+                return null;
+            }
+            try {
+                const worker = await Tesseract.createWorker('eng');
+                await worker.setParameters({
+                    tessedit_pageseg_mode: '10',
+                    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+                });
+                return worker;
+            } catch (e) {
+                console.error('Tesseract init failed:', e);
+                return null;
+            }
+        }
+
+        async runWaterOCR() {
+            const worker = await (this.stepState.zerroWorkerPromise || this.createZerroWorker());
+            if (!worker) return null;
+
+            const ctx = waterCanvas.getContext('2d');
+            const { width, height } = waterCanvas;
+            const imageData = ctx.getImageData(0, 0, width, height);
+            const data = imageData.data;
+
+            // Find bounding box of non-transparent pixels
+            let minX = width, minY = height, maxX = -1, maxY = -1;
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    if (data[(y * width + x) * 4 + 3] > 10) {
+                        if (x < minX) minX = x;
+                        if (x > maxX) maxX = x;
+                        if (y < minY) minY = y;
+                        if (y > maxY) maxY = y;
+                    }
+                }
+            }
+
+            if (maxX < minX || maxY < minY) return null;
+
+            const pad = 24; // TODO: maybe better with no pad? maybe not, if users do decide to do weird things?
+            const clipX = Math.max(0, minX - pad);
+            const clipY = Math.max(0, minY - pad);
+            const clipW = Math.min(width, maxX + pad) - clipX;
+            const clipH = Math.min(height, maxY + pad) - clipY;
+
+            // Build high-contrast black-on-white offscreen canvas for OCR
+            const offscreen = document.createElement('canvas');
+            offscreen.width = clipW;
+            offscreen.height = clipH;
+            const offCtx = offscreen.getContext('2d');
+            const clipped = ctx.getImageData(clipX, clipY, clipW, clipH);
+            const bw = offCtx.createImageData(clipW, clipH);
+            for (let i = 0; i < clipped.data.length; i += 4) {
+                const ink = clipped.data[i + 3] > 10 ? 0 : 255;
+                bw.data[i] = ink;
+                bw.data[i + 1] = ink;
+                bw.data[i + 2] = ink;
+                bw.data[i + 3] = 255;
+            }
+            offCtx.putImageData(bw, 0, 0);
+
+            try {
+                const { data: result } = await worker.recognize(offscreen);
+                const text = (result.text || '').trim().replace(/\s+/g, '');
+                return text[0] || null;
+            } catch (e) {
+                console.error('OCR failed:', e);
+                return null;
+            }
+        }
+
+        async runZerroTestSequence() {
+            if (!this.isCurrentStep('zerro')) return;
+            if (this.stepState.zerroTestActive) return;
+
+            this.stepState.zerroTestActive = true;
+            testButtonEl.disabled = true;
+
+            // Ensure the spell is parsed
+            await zerroScroll.transitionTo('parsed');
+            const snapshot = zerroScroll.getSnapshot();
+            if (snapshot.parseSuccess !== true) {
+                this.stepState.zerroTestActive = false;
+                testButtonEl.disabled = false;
+                return;
+            }
+
+            window.clearWater();
+            window.clearFires();
+
+            // Cast zerro() spell
+            await zerroScroll.executeCall('zerro()', {
+                initFunc: () => createMagicInitFunc(zerro),
+                onBeforeRun: () => getWorldState(zerro)
+            });
+
+            // Run OCR on the resulting water drawing
+            const letter = await this.runWaterOCR();
+
+            if (letter && letter.toLowerCase() === 'z') {
+                window.clearWater();
+                this.stepState.zerroTestActive = false;
+                testButtonEl.disabled = false;
+
+                this.showZerroSpeech(`Yay! Thank you!`);
+                await this.completeCurrentStep();
+                this.hideZerroSpeech()
+                return;
+            }
+
+            const displayLetter = letter || '?';
+            this.showZerroSpeech(`Hmm, looks more like a "${displayLetter}" to me.`);
+
+            window.clearWater();
+            window.clearFires();
+
+            this.stepState.zerroTestActive = false;
             testButtonEl.disabled = false;
         }
 
