@@ -403,13 +403,19 @@ function erodeWater(startX, startY, angle, startDist, endDist, width) {
 }
 
 // ============================================
-// PLAYER & GAME LOOP
+// Entities & GAME LOOP
 // ============================================
 const player = new Entity(
     window.innerWidth / 2,
     window.innerHeight / 2,
     '🧙'
 );
+
+const zerro = new Entity(
+    window.innerWidth / 2,
+    window.innerHeight + 120,
+    '👦'
+)
 
 // Click to move
 playArea.addEventListener('click', (e) => {
@@ -425,6 +431,7 @@ function gameLoop(currentTime) {
     lastTime = currentTime;
 
     player.update(deltaTime);
+    zerro.update(deltaTime);
 
     requestAnimationFrame(gameLoop);
 }

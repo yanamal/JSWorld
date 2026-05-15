@@ -147,20 +147,23 @@ const putOutFireScroll = createTargetedSpellScroll({
     editingEnabled: true
 });
 
-function executeSpellByName(spellName, onDone) {
-    const scrolls = {
-        splash:       { scrollRef: splashScroll,     targeted: false },
-        whoosh:       { scrollRef: whooshScroll,     targeted: true  },
-        put_out_fire: { scrollRef: putOutFireScroll, targeted: true  }
-    };
-    const spell = scrolls[spellName];
-    if (!spell || spell.scrollRef.getSnapshot().parseSuccess !== true) return false;
-    if (!spell.targeted) {
-        spell.scrollRef.executeCall('splash()', {
-            initFunc: () => createMagicInitFunc(player),
-            onBeforeRun: () => getWorldState(player)
-        });
-        return true;
+const zerroScroll = createCodeScroll(
+    '#zerro-scroll',
+    {
+        header: 'function zerro() {',
+        body: '    water(250, 0, 200)',
+        footer: '}',
+        trigger: 'zerro()'
+    },
+    {
+        initialState: 'editing',
+        editingEnabled: true,
+        onExecute: () => {
+            zerroScroll.executeCall('zerro()', {
+                initFunc: () => createMagicInitFunc(zerro),
+                onBeforeRun: () => getWorldState(zerro)
+            });
+        }
     }
-    return executeTargetedSpell({ scrollRef: spell.scrollRef, spellName, onDone });
-}
+)
+

@@ -189,6 +189,7 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
                     id: 'put-out-fire',
                     onEnter: async () => {
                         this.resetStep3OneTimeFlags();
+                        // TODO: assume clearWater/clearFires exists (everywhere)
                         if (typeof window.clearWater === 'function') {
                             window.clearWater();
                         }
@@ -216,6 +217,7 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
 
                         this.showSideSpeech(SIDE_TEXT.playWithFire);
 
+                        // TODO: stop highlighting (this and others in step 3) if it becomes irrelevant/we move past that point in the tutorial?
                         this.highlightElement(
                             'step3-parse-btn',
                             this.getSpellControl(putOutFireScroll, '.codescroll-state-editing .codescroll-parse-btn'),
@@ -224,6 +226,38 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
                     },
                     onEvent: () => {
                         // Step completion is handled by the explicit "Play with fire!" flow.
+                    }
+                },
+                {
+                    id: 'zerro',
+                    onEnter: async () => {
+                        // clear state
+                        window.clearWater();
+                        window.clearFires();
+                        this.hideSideSpeech();
+                        this.hideMainSpeech();
+
+                        // collapse previous spell
+                        putOutFireScroll.transitionTo('collapsed').then(()=>{
+                            // show and highlight zerro scroll
+                            zerroScroll.container.classList.remove('tutorial-scroll-hidden');
+                            this.highlightElement(
+                                'step4-zerro-scroll',
+                                this.getSpellControl(zerroScroll, '.codescroll-state-editing'),
+                                ['click']
+                            )
+                        })
+
+
+                        // move Zerro character into view
+                        zerro.moveTo(zerro.x, zerro.y-200); // Note/TODO: this coordinate system is confusing. these are global x and y as usually defined.
+
+
+                        // TODO: speech bubble to the right of zerro entity (coming from Zerro): "Hey, are you guys making new spells? Can you make one for me?"
+
+                        // TODO: "Let Zerro try it" button - similar to "test it" in previous step: clear water, clear fire; cast zerro() spell; test for completeness
+                        //   completeness check: take the magic system's water canvas, clip it (to remove blank whitespace from the sides; pass image to tesseract.js to parse/OCR one single letter.
+                        //   if the letter returned is "Z" (capital or lowercase), then pass. Otherwise, Zerro's dialog says "Hmm, looks more like a '[letter]' to me."
                     }
                 }
             ];
@@ -391,6 +425,11 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
             sideSpeechEl.innerHTML = '';
         }
 
+        hideMainSpeech() {
+            mainSpeechEl.hidden = true;
+            mainSpeechEl.innerHTML = '';
+        }
+
         showTestButton() {
             testButtonEl.hidden = false;
             testButtonEl.disabled = false;
@@ -554,8 +593,12 @@ Well, of course we can! Through the ✨magic of programming✨, we can create ne
             this.spawnSingleTestFire();
 
             this.stepState.waitingForTestCast = true;
-            const targetingStarted = executeSpellByName('put_out_fire', (detail) => {
-                this.handleTestCastResult(detail);
+            const targetingStarted = executeTargetedSpell({
+                scrollRef: putOutFireScroll,
+                spellName: 'put_out_fire',
+                onDone: (detail) => {
+                    this.handleTestCastResult(detail);
+                }
             });
 
             if (!targetingStarted) {

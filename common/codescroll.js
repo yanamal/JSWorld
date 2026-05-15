@@ -139,25 +139,6 @@
         });
     }
 
-    function getFixedTraceStepFilter(
-        include_produced_value = true,
-        include_exception = true,
-        include_completed_node = true,
-        include_side_effects = true,
-        include_pushed_node = false,
-        exclude_types = ['ExpressionStatement', 'BlockStatement']
-    ) {
-        return function (stepResult) {
-            if (exclude_types.includes(stepResult.activeNode.nodeType)) return false;
-            if (include_exception && stepResult.exception) return true;
-            if (include_completed_node && stepResult.completedNode) return true;
-            if (include_produced_value && stepResult.producedValue) return true;
-            if (include_side_effects && stepResult.hasSideEffect) return true;
-            if (include_pushed_node && stepResult.pushedNode) return true;
-            return false;
-        };
-    }
-
     class CodeScroll {
         constructor(container, definition, options) {
             if (!container) {
@@ -944,7 +925,7 @@
                 })
                 .then((result) => {
                     const fullTrace = Array.isArray(result.executionTrace) ? result.executionTrace : [];
-                    const condensedTrace = fullTrace.filter(getFixedTraceStepFilter());
+                    const condensedTrace = fullTrace.filter(getTraceStepFilter());
                     const condensedSlider = global.createTraceSlider(condensedTrace, this.container);
 
                     const readableTrace = getReadableTrace(
