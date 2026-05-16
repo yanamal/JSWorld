@@ -227,7 +227,7 @@ I think one of the strengths of this particular approach is that it allows for c
                         if (debuggyAssistant) {
                             debuggyAssistant.setVisible(true);
                             debuggyAssistant.setStatus(
-                                '🐥 I am your Rubber Ducky Bug Consulting Detective! I will help you investigate when things go wrong.',
+                                '🐥 I am your Rubber Ducky Consulting Bug Detective! I will help you investigate when things go wrong.',
                                 false
                             );
                         }
@@ -334,7 +334,9 @@ I think one of the strengths of this particular approach is that it allows for c
                             stateBefore: putOutFireScroll.model.lastStateBeforeRun || null,
                             playerCode: putOutFireScroll.getSnapshot().wholeCode,
                             executionTrace: null,
-                            parseErrorData: buildParseErrorData(putOutFireScroll, detail)
+                            parseErrorData: buildParseErrorData(putOutFireScroll, detail),
+                            world: 'elemental',
+                            problem: 'put_out_fire'
                         });
                     }
                 }
@@ -369,7 +371,9 @@ I think one of the strengths of this particular approach is that it allows for c
                         stateBefore: putOutFireScroll.model.lastStateBeforeRun,
                         playerCode: putOutFireScroll.getSnapshot().wholeCode,
                         executionTrace: putOutFireScroll.model.lastTrace,
-                        parseErrorData: null
+                        parseErrorData: null,
+                        world: 'elemental',
+                        problem: 'put_out_fire'
                     });
                 }
 
@@ -680,17 +684,20 @@ I think one of the strengths of this particular approach is that it allows for c
                     stateBefore: putOutFireScroll.model.lastStateBeforeRun,
                     playerCode: putOutFireScroll.getSnapshot().wholeCode,
                     executionTrace: putOutFireScroll.model.lastTrace,
-                    parseErrorData: null
+                    parseErrorData: null,
+                    world: 'elemental',
+                    problem: 'put_out_fire'
                 });
             }
 
             // clear fire and water from screen
-            if (typeof window.clearWater === 'function') {
-                window.clearWater();
-            }
-            if (typeof window.clearFires === 'function') {
-                window.clearFires();
-            }
+            // if (typeof window.clearWater === 'function') {
+            //     window.clearWater();
+            // }
+            // if (typeof window.clearFires === 'function') {
+            //     window.clearFires();
+            // }
+
             this.finishTestRun();
         }
 
@@ -722,7 +729,7 @@ I think one of the strengths of this particular approach is that it allows for c
                 const worker = await Tesseract.createWorker('eng');
                 await worker.setParameters({
                     tessedit_pageseg_mode: '10',
-                    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+                    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-\\/+'
                 });
                 return worker;
             } catch (e) {
@@ -830,10 +837,26 @@ I think one of the strengths of this particular approach is that it allows for c
             }
 
             const displayLetter = letter || '?';
-            this.showZerroSpeech(`Hmm, looks more like a "${displayLetter}" to me.`);
+            let zerroSpeech = `Hmm, looks more like a "${displayLetter}" to me.`;
+            if(!letter) {
+                zerroSpeech = "Hmm, that's neat, but it doesn't really look like a Z to me... or like any other letter"
+            }
+            this.showZerroSpeech(zerroSpeech);
 
-            window.clearWater();
-            window.clearFires();
+            if (debuggyAssistant) {
+                debuggyAssistant.beginAssistance({
+                    stateBefore: zerroScroll.model.lastStateBeforeRun || null,
+                    playerCode: zerroScroll.getSnapshot().wholeCode,
+                    executionTrace: zerroScroll.model.lastTrace || null,
+                    parseErrorData: null,
+                    world: 'elemental',
+                    problem: 'zerro',
+                    runResults: zerroSpeech
+                });
+            }
+
+            // window.clearWater();
+            // window.clearFires();
 
             this.stepState.zerroTestActive = false;
             testButtonEl.disabled = false;

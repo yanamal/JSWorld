@@ -23,7 +23,10 @@
         execution_trace,
         deduction_tree,
         active_node,
-        parse_error_data = null
+        parse_error_data = null,
+        world = null,
+        problem = null,
+        run_results = null
     ) {
         const stateData = {
             state_before,
@@ -31,7 +34,10 @@
             execution_trace,
             deduction_tree,
             active_node,
-            parse_error_data
+            parse_error_data,
+            world,
+            problem,
+            run_results
         };
 
         try {
@@ -338,7 +344,10 @@
                 stateBefore: null,
                 playerCode: '',
                 executionTrace: null,
-                parseErrorData: null
+                parseErrorData: null,
+                world: null,
+                problem: null,
+                runResults: null
             };
             this.listeners = new Map();
 
@@ -593,7 +602,10 @@
                 stateBefore: context?.stateBefore,
                 playerCode,
                 executionTrace: context?.executionTrace || null,
-                parseErrorData: context?.parseErrorData || null
+                parseErrorData: context?.parseErrorData || null,
+                world: context?.world || null,
+                problem: context?.problem || null,
+                runResults: context?.runResults || null
             };
 
             this.lastCodeStateKey = codeKey;
@@ -612,7 +624,10 @@
                     this.sessionContext.executionTrace,
                     requestTree,
                     null,
-                    this.sessionContext.parseErrorData
+                    this.sessionContext.parseErrorData,
+                    this.sessionContext.world,
+                    this.sessionContext.problem,
+                    this.sessionContext.runResults
                 );
 
                 const content = getDebuggyMessageContent(data);
@@ -661,7 +676,10 @@
                     this.sessionContext.executionTrace,
                     this.getTreeSnapshot(),
                     activeNode,
-                    this.sessionContext.parseErrorData
+                    this.sessionContext.parseErrorData,
+                    this.sessionContext.world,
+                    this.sessionContext.problem,
+                    this.sessionContext.runResults
                 );
                 const content = getDebuggyMessageContent(data);
                 const taggedItems = parseDebuggyTaggedItems(content);
