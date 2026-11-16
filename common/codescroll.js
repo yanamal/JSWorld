@@ -57,88 +57,6 @@
         return out;
     }
 
-    function getReadableTrace(origTrace, asts, codeSnippets) {
-        const trace = Array.isArray(origTrace) ? origTrace : [];
-        const astList = Array.isArray(asts) ? asts : [];
-        const snippets = Array.isArray(codeSnippets) ? codeSnippets : [];
-
-        function walkNodes(value, onNode) {
-            if (!value) return;
-            if (Array.isArray(value)) {
-                for (const item of value) walkNodes(item, onNode);
-                return;
-            }
-            if (typeof value !== 'object') return;
-            onNode(value);
-            for (const child of Object.values(value)) {
-                walkNodes(child, onNode);
-            }
-        }
-
-        const uuidToNodeRef = new Map();
-        astList.forEach((ast, snippetIndex) => {
-            walkNodes(ast, (node) => {
-                if (!node || typeof node !== 'object') return;
-                if (node.uuid === undefined || node.uuid === null) return;
-                const key = String(node.uuid);
-                if (!uuidToNodeRef.has(key)) {
-                    uuidToNodeRef.set(key, { node, snippetIndex });
-                }
-            });
-        });
-
-        function getNodeBounds(node) {
-            if (!node || typeof node !== 'object') return null;
-            if (Number.isInteger(node.start) && Number.isInteger(node.end)) {
-                return { start: node.start, end: node.end };
-            }
-            if (Array.isArray(node.range) && node.range.length >= 2) {
-                const start = node.range[0];
-                const end = node.range[1];
-                if (Number.isInteger(start) && Number.isInteger(end)) {
-                    return { start, end };
-                }
-            }
-            if (node.loc && typeof node.loc === 'object') {
-                const start = node.loc.start && node.loc.start.offset;
-                const end = node.loc.end && node.loc.end.offset;
-                if (Number.isInteger(start) && Number.isInteger(end)) {
-                    return { start, end };
-                }
-            }
-            return null;
-        }
-
-        function markExecutedCode(code, node) {
-            const text = typeof code === 'string' ? code : '';
-            const bounds = getNodeBounds(node);
-            if (!bounds) return text;
-            const start = Math.max(0, Math.min(text.length, bounds.start));
-            const end = Math.max(start, Math.min(text.length, bounds.end));
-            if (start === end) return text;
-            return `${text.slice(0, start)}★${text.slice(start, end)}★${text.slice(end)}`;
-        }
-
-        return trace.map((step) => {
-            const activeNode = step && step.activeNode ? step.activeNode : null;
-            const stepUuid = activeNode && activeNode.uuid !== undefined && activeNode.uuid !== null
-                ? String(activeNode.uuid)
-                : null;
-            const matched = stepUuid ? uuidToNodeRef.get(stepUuid) : null;
-            const snippetIndex = matched ? matched.snippetIndex : 0;
-            const snippet = snippets[snippetIndex] || '';
-            const matchedNode = matched ? matched.node : null;
-            return {
-                executedCode: markExecutedCode(snippet, matchedNode),
-                nodeType: activeNode && activeNode.nodeType
-                    ? activeNode.nodeType
-                    : (matchedNode && (matchedNode.nodeType || matchedNode.type)) || null,
-                ...(step.producedValue != null && { producedValue: step.producedValue }),
-                ...(step.exception != null     && { exception: step.exception }),
-            };
-        });
-    }
-
     class CodeScroll {
         constructor(container, definition, options) {
             if (!container) {
@@ -158,7 +76,8 @@
                 parseSuccess: null,
                 lastWholeCode: null,
                 lastTrace: null,
-                lastStateBeforeRun: null
+                lastStateBeforeRun: null,
+                lastCast: null
             };
             this._transitionChain = Promise.resolve();
             this._buildDom();
@@ -169,6 +88,7 @@
             // Parse initial code when creating
             const parsed = this._parseCurrentCode();
             this._renderParsedHtml(parsed);
+            this._notifyParsed(parsed);
         }
 
         _buildDom() {
@@ -564,6 +484,13 @@
             this.parsedCodeElem = this.parsedBody.firstElementChild || this.parsedBody;
         }
 
+        // Let the world know that the scroll's code was (re)parsed successfully, e.g. so that a caster can learn it
+        _notifyParsed(parsed) {
+            if (parsed.parse_success && isFn(this.options.onParsed)) {
+                this.options.onParsed(parsed, this);
+            }
+        }
+
         setState(stateName, opts) {
             const options = opts || {};
             if (!this.stateElems[stateName]) {
@@ -625,6 +552,7 @@
 
             const parsed = this._parseCurrentCode();
             this._renderParsedHtml(parsed);
+            this._notifyParsed(parsed);
             this._setWidthForState("parsed");
 
             const editingEl = this.stateElems.editing;
@@ -890,10 +818,7 @@
         }
 
         executeCall(callText, options) {
-            const { initFunc, onBeforeRun } = options || {};
-            if (isFn(onBeforeRun)) {
-                this.model.lastStateBeforeRun = onBeforeRun();
-            }
+            const { caster, onBeforeRun } = options;
 
             this.parsedFoot.innerHTML = '&nbsp;';
             const invokedState = this.model.currentState;
@@ -902,9 +827,6 @@
             this.triggerVizElem.innerHTML = parsedCall.html;
             this.setTriggerAtHome();
 
-            const combinedAst = structuredClone(this.model.parsed.ast);
-            combinedAst.body.push(...parsedCall.ast.body);
-
             const scrollId = this.container.id;
             const settled = (detail) => {
                 window.dispatchEvent(new CustomEvent('codescroll:cast-settled', { detail }));
@@ -912,29 +834,13 @@
             };
 
             return global.animateParse(this.triggerVizElem.children[0], 100, 20)
-                .then(() => {
-                    let interpSpeed = 0;
-                    if (invokedState === 'parsed') interpSpeed = 200;
-                    return global.interpretCode(
-                        this.container,
-                        combinedAst,
-                        interpSpeed,
-                        false,
-                        isFn(initFunc) ? initFunc() : undefined
-                    );
-                })
-                .then((result) => {
-                    const fullTrace = Array.isArray(result.executionTrace) ? result.executionTrace : [];
-                    const condensedTrace = fullTrace.filter(getTraceStepFilter());
-                    const condensedSlider = global.createTraceSlider(condensedTrace, result.visualInterpreter);
+                .then(() => caster.cast(parsedCall, { onBeforeRun }))
+                .then((record) => {
+                    const condensedSlider = global.createTraceSlider(record.condensedTrace, caster.visualInterpreter);
 
-                    const readableTrace = getReadableTrace(
-                        condensedTrace,
-                        [this.model.parsed.ast, parsedCall.ast],
-                        [this.getSnapshot().wholeCode, callText]
-                    );
-                    this.model.lastTrace = readableTrace;
-                    console.log(readableTrace)
+                    this.model.lastCast = record;
+                    this.model.lastTrace = record.readableTrace;
+                    this.model.lastStateBeforeRun = record.stateBefore;
 
                     this.parsedFoot.appendChild(condensedSlider);
 
@@ -943,7 +849,7 @@
                         this.triggerVizElem.style.display = 'none';
                     }
 
-                    const detail = { scrollId, ok: true, result, sliderElement: condensedSlider, invokedState };
+                    const detail = { scrollId, ok: true, result: record, sliderElement: condensedSlider, invokedState };
                     window.dispatchEvent(new CustomEvent('codescroll:cast-complete', { detail }));
                     return settled(detail);
                 })

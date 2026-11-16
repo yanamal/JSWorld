@@ -813,11 +813,9 @@ I think one of the strengths of this particular approach is that it allows for c
             window.clearWater();
             window.clearFires();
 
-            // Cast zerro() spell
-            await zerroScroll.executeCall('zerro()', {
-                initFunc: () => createMagicInitFunc(zerro),
-                onBeforeRun: () => getWorldState(zerro)
-            });
+            // Hand the spell over to Zerro, and let him cast it
+            await handZerroSpellToZerro();
+            const zerroCast = await zerroCastsZerro();
 
             // Run OCR on the resulting water drawing
             const letter = await this.runWaterOCR();
@@ -845,9 +843,9 @@ I think one of the strengths of this particular approach is that it allows for c
 
             if (debuggyAssistant) {
                 debuggyAssistant.beginAssistance({
-                    stateBefore: zerroScroll.model.lastStateBeforeRun || null,
+                    stateBefore: zerroCast.stateBefore,
                     playerCode: zerroScroll.getSnapshot().wholeCode,
-                    executionTrace: zerroScroll.model.lastTrace || null,
+                    executionTrace: zerroCast.readableTrace,
                     parseErrorData: null,
                     world: 'elemental',
                     problem: 'zerro',
@@ -881,9 +879,6 @@ I think one of the strengths of this particular approach is that it allows for c
         const randomX = Math.floor(Math.random() * (window.innerWidth-300))+150;
         const randomY = Math.floor(Math.random() * (window.innerHeight-300))+150;
         await zerro.moveTo(randomX, randomY)
-        await zerroScroll.executeCall('zerro()', {
-                initFunc: () => createMagicInitFunc(zerro),
-                onBeforeRun: () => getWorldState(zerro)
-            });
+        await zerroCastsZerro();
     }
 })();

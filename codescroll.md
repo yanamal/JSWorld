@@ -3,10 +3,11 @@
 A UI component representing a "code scroll" — a function definition the player can read, edit, parse, and execute. Defined in `common/codescroll.js`; styles in `common/codescroll.css`.
 
 Requires the following globals (provided by the visual interpreter library):
-- `parseIntoHTML(code)` → `{ html, ast, parse_success, error? }`
+- `parseIntoHTML(code)` → `{ code, html, ast, parse_success, error? }`
 - `animateParse(element, duration?, stagger?)` → Promise
-- `interpretCode(container, ast, speed, strict, initFunc)` → Promise → `{ executionTrace }`
-- `createTraceSlider(condensedTrace, container)` → HTMLElement
+- `createTraceSlider(condensedTrace, visualInterpreter)` → HTMLElement
+
+Running code goes through a `Caster` (`common/caster.js`): a spellcaster with its own persistent `VisualInterpreter`. The scroll itself doesn't know which caster(s) its code belongs to; the world decides (see `onParsed` and `executeCall`).
 
 ---
 
@@ -33,6 +34,7 @@ const scroll = createCodeScroll(containerOrSelector, definition, options);
 |---|---|---|---|
 | `initialState` | `'collapsed'` \| `'editing'` \| `'parsed'` | `'collapsed'` | State the scroll starts in |
 | `editingEnabled` | boolean | `true` | Whether the player can open the editor |
+| `onParsed` | function | — | Called with `(parsed, scroll)` whenever the scroll's code is parsed *successfully*: on creation, and on every editing→parsed transition. Typically used to have a caster learn the function, e.g. `onParsed: (parsed) => playerCaster.learn(parsed)`. |
 | `onExecute` | function | — | Called when the user triggers execution (clicks the collapsed head or the ▶ button). Receives `{ event, trigger, parsed, parseSuccess, scroll }`. The world is responsible for doing something with it (e.g. calling `scroll.executeCall`). |
 | `onTransitionComplete` | function | — | Called after any state transition completes. Receives `{ from, to, scroll }`. |
 | `transitionCallbacks` | object | — | Map of `"from->to"` strings to callbacks, e.g. `{ "editing->parsed": (scroll) => ... }`. Called in addition to `onTransitionComplete`. |
@@ -130,23 +132,23 @@ Returns structured error info from the most recent parse attempt:
 ### Execution
 
 #### `scroll.executeCall(callText, options)` → Promise
-Runs the full execution sequence: parse the call text, animate the triggerViz, interpret the combined AST, build the trace slider, store the readable trace. The world calls this after any needed user input (e.g. targeting clicks) is complete.
+Runs the full execution sequence: parse the call text, animate the triggerViz, have the caster cast it (the trace can step into this scroll's code and any other code the caster has learned), build the trace slider, store the readable trace. The world calls this after any needed user input (e.g. targeting clicks) is complete.
 
 ```js
 scroll.executeCall('whoosh(45, -12)', {
-    initFunc:    () => createMagicInitFunc(player),  // factory — called at run time
-    onBeforeRun: () => getWorldState(player)          // result stored in scroll.model.lastStateBeforeRun
+    caster:      playerCaster,                  // whose interpreter runs the call (must have learned the function)
+    onBeforeRun: () => getWorldState(player)    // result stored in scroll.model.lastStateBeforeRun
 });
 ```
 
 | Option | Type | Description |
 |---|---|---|
-| `initFunc` | `() => initObject` | Factory called just before `interpretCode`. Returns the environment object the interpreter uses to resolve world-specific functions. |
-| `onBeforeRun` | `() => any` | Called before execution starts; return value is stored in `scroll.model.lastStateBeforeRun` for later use (e.g. debugging). |
+| `caster` | `Caster` | The caster that casts the call. Code is animated wherever it's visible (e.g. not inside collapsed scrolls). |
+| `onBeforeRun` | `() => any` | Called right before the run actually starts (casts on one caster are queued); return value is stored in `scroll.model.lastStateBeforeRun` for later use (e.g. debugging). |
 
 Dispatches these window events on completion:
 - **`codescroll:cast-settled`** — always fires, whether the run succeeded or failed. Detail: `{ scrollId, ok, invokedState, result? error? sliderElement? }`.
-- **`codescroll:cast-complete`** — fires on success. Same detail plus `result` and `sliderElement`.
+- **`codescroll:cast-complete`** — fires on success. Same detail plus `result` (the caster's cast record) and `sliderElement`.
 - **`codescroll:cast-error`** — fires on failure. Same detail plus `error`.
 
 `invokedState` is the state the scroll was in when `executeCall` was called (`'collapsed'` or `'parsed'`).
@@ -186,6 +188,7 @@ These are on `scroll.model` and written by the scroll itself; read them from out
 
 | Field | Written by | Contents |
 |---|---|---|
+| `lastCast` | `executeCall` | The caster's cast record from the most recent execution (see `Caster.cast` in `common/caster.js`) |
 | `lastTrace` | `executeCall` | Readable trace from the most recent execution — array of `{ executedCode, producedValue, nodeType, exception }` |
 | `lastStateBeforeRun` | `executeCall` (via `onBeforeRun`) | Whatever `onBeforeRun()` returned; intended for world state snapshots used in debugging |
 
@@ -202,6 +205,8 @@ The container element is available as `scroll.container`. The Ace editor instanc
 Minimal pattern for a non-targeted spell (no user input phase):
 
 ```js
+const playerCaster = new Caster('player', buildWorldInitFunc(player));
+
 const myScroll = createCodeScroll('#my-scroll', {
     header: 'function doThing() {',
     body:   '    // player writes code here',
@@ -210,14 +215,17 @@ const myScroll = createCodeScroll('#my-scroll', {
 }, {
     initialState: 'collapsed',
     editingEnabled: true,
+    onParsed: (parsed) => playerCaster.learn(parsed),
     onExecute: () => {
         myScroll.executeCall('doThing()', {
-            initFunc:    () => buildWorldEnv(),
+            caster:      playerCaster,
             onBeforeRun: () => captureWorldState()
         });
     }
 });
 ```
+
+To give a scroll's spell to another caster, have it learn a *re-parsed copy* (a parsed snippet can only be run by one caster's interpreter): `otherCaster.learn(parseIntoHTML(myScroll.getSnapshot().wholeCode))`. Its casts then don't animate the scroll.
 
 For a spell with a user targeting phase, call `startTriggerFollowingMouse` when targeting begins, then `executeCall` when the user commits:
 
@@ -231,7 +239,7 @@ onExecute: () => {
         window.removeEventListener('click', handler, true);
         const callText = `cast(${toLocalX(e.clientX)}, ${toLocalY(e.clientY)})`;
         myScroll.executeCall(callText, {
-            initFunc:    () => buildWorldEnv(),
+            caster:      playerCaster,
             onBeforeRun: () => captureWorldState()
         });
     }, true);

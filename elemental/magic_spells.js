@@ -1,3 +1,10 @@
+// Each spellcaster has their own persistent interpreter: spells they've learned stay available to all their later casts.
+const playerCaster = new Caster('player', createMagicInitFunc(player));
+const zerroCaster = new Caster('zerro', createMagicInitFunc(zerro));
+
+// The player learns each of their scrolls' spells whenever the scroll's code is (re)parsed
+const learnForPlayer = (parsed) => playerCaster.learn(parsed);
+
 let mousex = null;
 let mousey = null;
 const targetingCue = document.getElementById('targetingCue');
@@ -65,7 +72,7 @@ function executeTargetedSpell({ scrollRef, spellName, onDone }) {
 
         const callText = getTargetedCallText(spellName, mousex, mousey);
         scrollRef.executeCall(callText, {
-            initFunc: () => createMagicInitFunc(player),
+            caster: playerCaster,
             onBeforeRun: () => getWorldState(player)
         }).then((detail) => {
             targetedSpellInProgress = false;
@@ -93,6 +100,7 @@ function createTargetedSpellScroll({ scrollId, spellName, body, editingEnabled }
         {
             initialState: 'collapsed',
             editingEnabled: !!editingEnabled,
+            onParsed: learnForPlayer,
             onExecute: () => {
                 executeTargetedSpell({ scrollRef: spellScroll, spellName });
             },
@@ -123,9 +131,10 @@ const splashScroll = createCodeScroll(
     {
         initialState: 'collapsed',
         editingEnabled: false,
+        onParsed: learnForPlayer,
         onExecute: () => {
             splashScroll.executeCall('splash()', {
-                initFunc: () => createMagicInitFunc(player),
+                caster: playerCaster,
                 onBeforeRun: () => getWorldState(player)
             });
         }
@@ -158,12 +167,28 @@ const zerroScroll = createCodeScroll(
     {
         initialState: 'editing',
         editingEnabled: true,
+        // While the player is writing Zerro's spell, it's the player's: they learn it, and their test casts are relative to them
+        onParsed: learnForPlayer,
         onExecute: () => {
             zerroScroll.executeCall('zerro()', {
-                initFunc: () => createMagicInitFunc(zerro),
-                onBeforeRun: () => getWorldState(zerro)
+                caster: playerCaster,
+                onBeforeRun: () => getWorldState(player)
             });
         }
     }
 )
+
+// Hand the zerro spell over to Zerro: he copies the text of the scroll's last-parsed code and learns his own copy
+// (re-parsed, so it's separate from the player's: casting it doesn't animate the player's scroll).
+// Assumes the scroll's code parsed successfully.
+function handZerroSpellToZerro() {
+    return zerroCaster.learn(parseIntoHTML(zerroScroll.getSnapshot().wholeCode));
+}
+
+// Zerro casts his own copy of the zerro spell
+function zerroCastsZerro() {
+    return zerroCaster.cast(parseIntoHTML('zerro()'), {
+        onBeforeRun: () => getWorldState(zerro)
+    });
+}
 
