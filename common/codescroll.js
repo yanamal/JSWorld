@@ -926,7 +926,7 @@
                 .then((result) => {
                     const fullTrace = Array.isArray(result.executionTrace) ? result.executionTrace : [];
                     const condensedTrace = fullTrace.filter(getTraceStepFilter());
-                    const condensedSlider = global.createTraceSlider(condensedTrace, this.container);
+                    const condensedSlider = global.createTraceSlider(condensedTrace, result.visualInterpreter);
 
                     const readableTrace = getReadableTrace(
                         condensedTrace,
